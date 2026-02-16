@@ -15,15 +15,13 @@
  */
 
 const FirebaseConfig = {
-  // ====== ВСТАВЬТЕ СВОИ ДАННЫЕ СЮДА ======
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-  // ========================================
+  apiKey: "AIzaSyBtIIvENMtLZKuom_8KddxC7t61e8KVR8g",
+  authDomain: "first-9c907.firebaseapp.com",
+  databaseURL: "https://first-9c907-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "first-9c907",
+  storageBucket: "first-9c907.firebasestorage.app",
+  messagingSenderId: "453031753417",
+  appId: "1:453031753417:web:264a0b375bef867fdf7f18"
 };
 
 /**
