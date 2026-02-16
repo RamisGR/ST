@@ -5,20 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Рейтинг — TestArena</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .live-indicator {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    .live-bar {
+      background: linear-gradient(135deg, rgba(0,184,148,0.1), rgba(0,206,201,0.1));
+      border: 1px solid rgba(0,184,148,0.3);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .live-bar-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--success);
+    }
+    .live-user {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-input);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      margin: 3px 4px;
+    }
+    .auto-refresh-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-left: 12px;
+    }
+  </style>
 </head>
 <body>
   <div id="app"></div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
+    Storage.initFirebase();
+
     (function() {
       const user = Utils.requireAuth();
       if (!user) return;
 
       const selectedTestId = Utils.getQueryParam('test');
+      let liveSessions = [];
+
+      // Initial render
       render();
+
+      // Real-time: re-render leaderboard when results change
+      Storage.onResultsChange(() => {
+        renderLeaderboardContent();
+      });
+
+      // Real-time: track who is currently taking a test
+      Storage.onSessionsChange((sessions) => {
+        liveSessions = sessions;
+        renderLiveBar();
+      });
 
       function render() {
         const tests = Storage.getTests();
@@ -26,7 +87,16 @@
         document.getElementById('app').innerHTML = `
           ${Utils.renderHeader(user, 'leaderboard')}
           <div class="container fade-in">
-            <h2 style="margin:24px 0 16px;">Рейтинг участников</h2>
+            <div style="display:flex; align-items:center; flex-wrap:wrap; margin:24px 0 16px;">
+              <h2>Рейтинг участников</h2>
+              ${Storage.isOnline() ? `
+                <span class="auto-refresh-note">
+                  <span class="live-indicator"></span> Обновляется автоматически
+                </span>
+              ` : ''}
+            </div>
+
+            <div id="live-bar-container"></div>
 
             <div style="margin-bottom:24px;">
               <div class="tabs">
@@ -44,6 +114,45 @@
 
             <div id="leaderboard-content">
               ${selectedTestId ? renderTestLeaderboard(selectedTestId) : renderOverallLeaderboard()}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLeaderboardContent() {
+        const el = document.getElementById('leaderboard-content');
+        if (!el) return;
+        el.innerHTML = selectedTestId ? renderTestLeaderboard(selectedTestId) : renderOverallLeaderboard();
+      }
+
+      function renderLiveBar() {
+        const container = document.getElementById('live-bar-container');
+        if (!container) return;
+
+        // Filter sessions for current test (or all)
+        const relevant = selectedTestId
+          ? liveSessions.filter(s => s.testId === selectedTestId)
+          : liveSessions;
+
+        if (relevant.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="live-bar">
+            <div class="live-bar-title">
+              <span class="live-indicator"></span>
+              Сейчас проходят тест: ${relevant.length} чел.
+            </div>
+            <div>
+              ${relevant.map(s => `
+                <span class="live-user">
+                  <span class="live-indicator"></span>
+                  ${Utils.escapeHtml(s.userName)}
+                  ${s.testTitle ? `<small style="color:var(--text-muted);">— ${Utils.escapeHtml(s.testTitle)}</small>` : ''}
+                </span>
+              `).join('')}
             </div>
           </div>
         `;
@@ -103,6 +212,9 @@
               </tbody>
             </table>
           </div>
+          <p style="color:var(--text-muted); font-size:0.85rem; margin-top:12px;">
+            Показан лучший результат каждого участника. Всего попыток: ${results.length}
+          </p>
         `;
       }
 

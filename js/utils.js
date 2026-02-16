@@ -51,9 +51,15 @@ const Utils = (() => {
 
   function renderHeader(user, activePage) {
     const isAdmin = user && user.role === 'admin';
+    const online = Storage.isOnline();
     return `
       <header class="header">
-        <a href="index.html" class="header-logo">TestArena</a>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <a href="index.html" class="header-logo">TestArena</a>
+          <span class="badge ${online ? 'badge-live' : 'badge-ended'}" style="font-size:0.7rem;">
+            ${online ? 'ONLINE' : 'OFFLINE'}
+          </span>
+        </div>
         <nav class="header-nav">
           ${user ? `<span class="header-user">${escapeHtml(user.name)}${user.group ? ' (' + escapeHtml(user.group) + ')' : ''}</span>` : ''}
           <a href="tests.html" class="btn btn-sm ${activePage === 'tests' ? 'btn-primary' : 'btn-outline'}">Тесты</a>

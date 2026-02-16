@@ -9,10 +9,16 @@
 <body>
   <div id="app"></div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
+    Storage.initFirebase();
     (function() {
       const user = Utils.requireAuth();
       if (!user) return;
@@ -71,6 +77,17 @@
         `;
         document.getElementById('startBtn').addEventListener('click', () => {
           startTime = Date.now();
+          // Register live session so others can see who's taking the test
+          const sessionId = Storage.generateId();
+          window._testSessionId = sessionId;
+          Storage.saveSession({
+            id: sessionId,
+            userName: user.name,
+            userGroup: user.group,
+            testId: test.id,
+            testTitle: test.title,
+            startedAt: startTime,
+          });
           startTimer();
           renderQuestion();
         });
@@ -187,6 +204,11 @@
         if (finished) return;
         finished = true;
         clearInterval(timerInterval);
+
+        // Remove live session
+        if (window._testSessionId) {
+          Storage.removeSession(window._testSessionId);
+        }
 
         const timeSpent = Math.round((Date.now() - startTime) / 1000);
         let correctCount = 0;

@@ -21,10 +21,16 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
+    Storage.initFirebase();
     (function() {
       const user = Utils.requireAuth();
       if (!user || user.role !== 'admin') {
@@ -329,7 +335,7 @@
 
       window.confirmClearResults = function() {
         showConfirmModal('Очистить все результаты?', 'Это действие нельзя отменить.', () => {
-          localStorage.removeItem('ct_results');
+          Storage.clearAllResults();
           Utils.showNotification('Результаты очищены', 'success');
           render();
         });
@@ -367,10 +373,7 @@
 
       window.confirmResetAll = function() {
         showConfirmModal('Сбросить ВСЕ данные?', 'Будут удалены все тесты, результаты и настройки. Это нельзя отменить!', () => {
-          localStorage.removeItem('ct_tests');
-          localStorage.removeItem('ct_results');
-          localStorage.removeItem('ct_sessions');
-          localStorage.removeItem('ct_admin_password');
+          Storage.resetAllData();
           Utils.showNotification('Все данные сброшены', 'success');
           render();
         });
