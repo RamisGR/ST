@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TestArena — Соревновательные тесты</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    (function() {
+      const user = Storage.getUser();
+      if (user) {
+        window.location.href = 'tests.html';
+        return;
+      }
+      render();
+
+      function render() {
+        document.getElementById('app').innerHTML = `
+          <div class="hero fade-in">
+            <h1>TestArena</h1>
+            <p>Платформа для соревновательного выполнения тестов. Войдите, чтобы начать!</p>
+
+            <div class="login-card card">
+              <div class="card-header">Вход</div>
+              <form id="loginForm">
+                <div class="form-group">
+                  <label for="name">Ваше имя</label>
+                  <input type="text" id="name" class="form-control" placeholder="Иван Иванов" required maxlength="50">
+                </div>
+                <div class="form-group">
+                  <label for="group">Группа / Класс</label>
+                  <input type="text" id="group" class="form-control" placeholder="10-А" maxlength="30">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg">Войти как студент</button>
+              </form>
+              <div style="text-align:center; margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+                <button id="adminBtn" class="btn btn-outline btn-sm">Войти как администратор</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const name = document.getElementById('name').value.trim();
+          const group = document.getElementById('group').value.trim();
+          if (!name) return;
+
+          Storage.setUser({ name, group, role: 'student' });
+          window.location.href = 'tests.html';
+        });
+
+        document.getElementById('adminBtn').addEventListener('click', () => {
+          showAdminLogin();
+        });
+      }
+
+      function showAdminLogin() {
+        document.getElementById('app').innerHTML = `
+          <div class="hero fade-in">
+            <h1>TestArena</h1>
+            <p>Панель администратора</p>
+
+            <div class="login-card card">
+              <div class="card-header">Вход администратора</div>
+              <form id="adminForm">
+                <div class="form-group">
+                  <label for="adminPass">Пароль администратора</label>
+                  <input type="password" id="adminPass" class="form-control" placeholder="Введите пароль" required>
+                </div>
+                <p style="color: var(--text-muted); font-size:0.85rem; margin-bottom:16px;">
+                  Пароль по умолчанию: <code style="background:var(--bg-input); padding:2px 8px; border-radius:4px;">admin</code>
+                </p>
+                <button type="submit" class="btn btn-accent btn-block btn-lg">Войти</button>
+                <button type="button" id="backBtn" class="btn btn-outline btn-block" style="margin-top:8px;">Назад</button>
+              </form>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('adminForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const pass = document.getElementById('adminPass').value;
+          // Simple password check. In production, use Firebase Auth.
+          const adminPassword = localStorage.getItem('ct_admin_password') || 'admin';
+          if (pass === adminPassword) {
+            Storage.setUser({ name: 'Администратор', group: '', role: 'admin' });
+            window.location.href = 'admin.html';
+          } else {
+            Utils.showNotification('Неверный пароль!', 'error');
+          }
+        });
+
+        document.getElementById('backBtn').addEventListener('click', () => {
+          render();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

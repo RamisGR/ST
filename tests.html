@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тесты — TestArena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    (function() {
+      const user = Utils.requireAuth();
+      if (!user) return;
+
+      render();
+
+      function render() {
+        const tests = Storage.getTests();
+        const userResults = Storage.getUserResults(user.name);
+        const completedTestIds = new Set(userResults.map(r => r.testId));
+
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'tests')}
+          <div class="container fade-in">
+            <h2 style="margin:24px 0 8px;">Доступные тесты</h2>
+            <p style="color:var(--text-muted); margin-bottom:20px;">Выберите тест для прохождения. Соревнуйтесь с другими участниками!</p>
+
+            ${tests.length === 0 ? `
+              <div class="empty-state">
+                <div class="empty-state-icon">&#128203;</div>
+                <p>Тестов пока нет. Попросите администратора создать тесты.</p>
+              </div>
+            ` : `
+              <div class="test-grid">
+                ${tests.map(test => {
+                  const completed = completedTestIds.has(test.id);
+                  const results = Storage.getResultsForTest(test.id);
+                  const myResult = userResults.find(r => r.testId === test.id);
+                  return `
+                    <div class="test-card">
+                      <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
+                      <div class="test-card-meta">
+                        <span>&#128221; ${test.questions.length} вопросов</span>
+                        <span>&#9201; ${Utils.formatTime(test.timeLimit)}</span>
+                        <span>&#128101; ${results.length} попыток</span>
+                        ${completed ? `<br><span style="color:var(--success);">&#9989; Пройден (${myResult ? myResult.score + '%' : ''})</span>` : ''}
+                      </div>
+                      <div class="test-card-actions">
+                        <button onclick="startTest('${test.id}')" class="btn btn-sm ${completed ? 'btn-outline' : 'btn-primary'}">
+                          ${completed ? 'Пройти снова' : 'Начать тест'}
+                        </button>
+                        <a href="leaderboard.html?test=${test.id}" class="btn btn-sm btn-outline">Рейтинг</a>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        `;
+      }
+
+      window.startTest = function(testId) {
+        window.location.href = `test.html?id=${testId}`;
+      };
+    })();
+  </script>
+</body>
+</html>

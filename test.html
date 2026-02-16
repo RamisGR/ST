@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тест — TestArena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    (function() {
+      const user = Utils.requireAuth();
+      if (!user) return;
+
+      const testId = Utils.getQueryParam('id');
+      const test = Storage.getTest(testId);
+      if (!test) {
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'tests')}
+          <div class="container">
+            <div class="empty-state">
+              <div class="empty-state-icon">&#10060;</div>
+              <p>Тест не найден.</p>
+              <a href="tests.html" class="btn btn-primary" style="margin-top:16px;">К списку тестов</a>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // Test state
+      let currentQuestion = 0;
+      let answers = new Array(test.questions.length).fill(-1);
+      let timeLeft = test.timeLimit;
+      let startTime = Date.now();
+      let timerInterval = null;
+      let finished = false;
+
+      // Show confirmation before starting
+      showStartScreen();
+
+      function showStartScreen() {
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'tests')}
+          <div class="container fade-in" style="max-width:600px;">
+            <div class="card" style="text-align:center; margin-top:40px;">
+              <h2 style="margin-bottom:12px;">${Utils.escapeHtml(test.title)}</h2>
+              <p style="color:var(--text-muted); margin-bottom:24px;">${Utils.escapeHtml(test.description || '')}</p>
+              <div class="result-details" style="margin-bottom:32px;">
+                <div class="result-detail-item">
+                  <div class="value">${test.questions.length}</div>
+                  <div class="label">Вопросов</div>
+                </div>
+                <div class="result-detail-item">
+                  <div class="value">${Utils.formatTime(test.timeLimit)}</div>
+                  <div class="label">Время</div>
+                </div>
+              </div>
+              <p style="color:var(--warning); font-size:0.9rem; margin-bottom:24px;">
+                &#9888; После начала таймер нельзя остановить. Убедитесь, что вы готовы!
+              </p>
+              <button id="startBtn" class="btn btn-primary btn-lg btn-block">Начать тест</button>
+              <a href="tests.html" class="btn btn-outline btn-block" style="margin-top:8px;">Назад</a>
+            </div>
+          </div>
+        `;
+        document.getElementById('startBtn').addEventListener('click', () => {
+          startTime = Date.now();
+          startTimer();
+          renderQuestion();
+        });
+      }
+
+      function startTimer() {
+        timerInterval = setInterval(() => {
+          timeLeft--;
+          updateTimerDisplay();
+          if (timeLeft <= 0) {
+            finishTest();
+          }
+        }, 1000);
+      }
+
+      function updateTimerDisplay() {
+        const el = document.getElementById('timer');
+        if (!el) return;
+        el.textContent = Utils.formatTime(timeLeft);
+        el.className = 'timer';
+        if (timeLeft <= 30) el.classList.add('danger');
+        else if (timeLeft <= 60) el.classList.add('warning');
+      }
+
+      function renderQuestion() {
+        if (finished) return;
+        const q = test.questions[currentQuestion];
+        const progress = ((currentQuestion + 1) / test.questions.length) * 100;
+
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'tests')}
+          <div class="container slide-in" style="max-width:700px;">
+            <div class="test-header">
+              <div class="test-title">${Utils.escapeHtml(test.title)}</div>
+              <div id="timer" class="timer">${Utils.formatTime(timeLeft)}</div>
+            </div>
+
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width:${progress}%"></div>
+            </div>
+
+            <div class="question-card card">
+              <div class="question-number">Вопрос ${currentQuestion + 1} из ${test.questions.length}</div>
+              <div class="question-text">${Utils.escapeHtml(q.text)}</div>
+              <div class="options-list">
+                ${q.options.map((opt, i) => `
+                  <button class="option-btn ${answers[currentQuestion] === i ? 'selected' : ''}"
+                          onclick="selectAnswer(${i})">
+                    <strong>${String.fromCharCode(65 + i)}.</strong> ${Utils.escapeHtml(opt)}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="question-nav">
+              <button onclick="prevQuestion()" class="btn btn-outline btn-sm" ${currentQuestion === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : ''}>
+                &#8592; Назад
+              </button>
+
+              <div class="question-dots">
+                ${test.questions.map((_, i) => `
+                  <button class="question-dot ${i === currentQuestion ? 'active' : ''} ${answers[i] >= 0 ? 'answered' : ''}"
+                          onclick="goToQuestion(${i})">${i + 1}</button>
+                `).join('')}
+              </div>
+
+              ${currentQuestion === test.questions.length - 1 ? `
+                <button onclick="confirmFinish()" class="btn btn-accent btn-sm">Завершить &#10003;</button>
+              ` : `
+                <button onclick="nextQuestion()" class="btn btn-primary btn-sm">Далее &#8594;</button>
+              `}
+            </div>
+          </div>
+        `;
+
+        updateTimerDisplay();
+      }
+
+      window.selectAnswer = function(index) {
+        answers[currentQuestion] = index;
+        renderQuestion();
+      };
+
+      window.prevQuestion = function() {
+        if (currentQuestion > 0) {
+          currentQuestion--;
+          renderQuestion();
+        }
+      };
+
+      window.nextQuestion = function() {
+        if (currentQuestion < test.questions.length - 1) {
+          currentQuestion++;
+          renderQuestion();
+        }
+      };
+
+      window.goToQuestion = function(index) {
+        currentQuestion = index;
+        renderQuestion();
+      };
+
+      window.confirmFinish = function() {
+        const unanswered = answers.filter(a => a === -1).length;
+        if (unanswered > 0) {
+          if (!confirm(`У вас ${unanswered} вопрос(ов) без ответа. Завершить тест?`)) {
+            return;
+          }
+        }
+        finishTest();
+      };
+
+      function finishTest() {
+        if (finished) return;
+        finished = true;
+        clearInterval(timerInterval);
+
+        const timeSpent = Math.round((Date.now() - startTime) / 1000);
+        let correctCount = 0;
+        const questionResults = test.questions.map((q, i) => {
+          const isCorrect = answers[i] === q.correct;
+          if (isCorrect) correctCount++;
+          return {
+            questionId: q.id,
+            selected: answers[i],
+            correct: q.correct,
+            isCorrect,
+          };
+        });
+
+        const score = Math.round((correctCount / test.questions.length) * 100);
+
+        const result = {
+          id: Storage.generateId(),
+          testId: test.id,
+          testTitle: test.title,
+          userName: user.name,
+          userGroup: user.group,
+          score,
+          correctCount,
+          totalQuestions: test.questions.length,
+          timeSpent,
+          answers: questionResults,
+          completedAt: Date.now(),
+        };
+
+        Storage.saveResult(result);
+        showResults(result);
+      }
+
+      function showResults(result) {
+        const scoreClass = result.score >= 90 ? 'excellent' :
+                          result.score >= 70 ? 'good' :
+                          result.score >= 50 ? 'average' : 'poor';
+
+        const allResults = Storage.getResultsForTest(test.id);
+        const rank = allResults.findIndex(r => r.id === result.id) + 1;
+
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'tests')}
+          <div class="container fade-in" style="max-width:700px;">
+            <div class="card result-summary">
+              <h2>Тест завершён!</h2>
+              <div class="result-score ${scoreClass}">${result.score}%</div>
+              <p style="color:var(--text-muted); font-size:1.1rem;">
+                ${result.score >= 90 ? 'Превосходно!' :
+                  result.score >= 70 ? 'Хороший результат!' :
+                  result.score >= 50 ? 'Неплохо, но можно лучше!' : 'Стоит подучить материал.'}
+              </p>
+
+              <div class="result-details">
+                <div class="result-detail-item">
+                  <div class="value">${result.correctCount}/${result.totalQuestions}</div>
+                  <div class="label">Правильных</div>
+                </div>
+                <div class="result-detail-item">
+                  <div class="value">${Utils.formatTime(result.timeSpent)}</div>
+                  <div class="label">Время</div>
+                </div>
+                <div class="result-detail-item">
+                  <div class="value">#${rank}</div>
+                  <div class="label">Место в рейтинге</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-top:20px;">
+              <div class="card-header">Разбор ответов</div>
+              ${test.questions.map((q, i) => {
+                const r = result.answers[i];
+                return `
+                  <div style="padding:12px 0; ${i < test.questions.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+                    <div class="question-number">Вопрос ${i + 1} ${r.isCorrect ? '<span style="color:var(--success)">&#9989;</span>' : '<span style="color:var(--danger)">&#10060;</span>'}</div>
+                    <div style="font-weight:600; margin-bottom:8px;">${Utils.escapeHtml(q.text)}</div>
+                    <div class="options-list" style="gap:6px;">
+                      ${q.options.map((opt, j) => {
+                        let cls = '';
+                        if (j === q.correct) cls = 'correct';
+                        else if (j === r.selected && !r.isCorrect) cls = 'wrong';
+                        return `<div class="option-btn ${cls}" style="cursor:default;">
+                          <strong>${String.fromCharCode(65 + j)}.</strong> ${Utils.escapeHtml(opt)}
+                          ${j === q.correct ? ' <span style="color:var(--success);">(правильный)</span>' : ''}
+                          ${j === r.selected && !r.isCorrect ? ' <span style="color:var(--danger);">(ваш ответ)</span>' : ''}
+                        </div>`;
+                      }).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top:20px; flex-wrap:wrap;">
+              <a href="leaderboard.html?test=${test.id}" class="btn btn-primary">Рейтинг этого теста</a>
+              <a href="tests.html" class="btn btn-outline">К списку тестов</a>
+            </div>
+          </div>
+        `;
+      }
+    })();
+  </script>
+</body>
+</html>

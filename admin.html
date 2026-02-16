@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель — TestArena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Modal for confirmation -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal">
+      <h2 id="modalTitle">Подтверждение</h2>
+      <p id="modalText"></p>
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn btn-outline">Отмена</button>
+        <button id="modalConfirm" class="btn btn-danger">Удалить</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    (function() {
+      const user = Utils.requireAuth();
+      if (!user || user.role !== 'admin') {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      let currentTab = 'tests'; // 'tests' | 'editor' | 'results' | 'settings'
+      let editingTest = null;
+
+      render();
+
+      function render() {
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'admin')}
+          <div class="container-wide fade-in">
+            <h2 style="margin:24px 0 16px;">Панель администратора</h2>
+
+            <div class="tabs">
+              <button class="tab ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">Мои тесты</button>
+              <button class="tab ${currentTab === 'editor' ? 'active' : ''}" onclick="switchTab('editor')">
+                ${editingTest ? 'Редактирование' : 'Новый тест'}
+              </button>
+              <button class="tab ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">Результаты</button>
+              <button class="tab ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">Настройки</button>
+            </div>
+
+            <div id="tabContent"></div>
+          </div>
+        `;
+
+        switch (currentTab) {
+          case 'tests': renderTestsList(); break;
+          case 'editor': renderEditor(); break;
+          case 'results': renderResults(); break;
+          case 'settings': renderSettings(); break;
+        }
+      }
+
+      window.switchTab = function(tab) {
+        currentTab = tab;
+        if (tab === 'editor' && !editingTest) {
+          editingTest = createEmptyTest();
+        }
+        render();
+      };
+
+      // ——— Tests List ———
+      function renderTestsList() {
+        const tests = Storage.getTests();
+        document.getElementById('tabContent').innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <p style="color:var(--text-muted);">Всего тестов: ${tests.length}</p>
+            <button onclick="createNewTest()" class="btn btn-primary btn-sm">+ Создать тест</button>
+          </div>
+          ${tests.length === 0 ? `
+            <div class="empty-state">
+              <div class="empty-state-icon">&#128203;</div>
+              <p>Тестов пока нет. Создайте первый!</p>
+            </div>
+          ` : `
+            <div class="test-grid">
+              ${tests.map(test => {
+                const results = Storage.getResultsForTest(test.id);
+                return `
+                  <div class="test-card">
+                    <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
+                    <div class="test-card-meta">
+                      <span>&#128221; ${test.questions.length} вопросов</span>
+                      <span>&#9201; ${Utils.formatTime(test.timeLimit)}</span>
+                      <span>&#128101; ${results.length} попыток</span>
+                    </div>
+                    <div class="test-card-actions">
+                      <button onclick="editTest('${test.id}')" class="btn btn-sm btn-outline">Редактировать</button>
+                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Удалить</button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        `;
+      }
+
+      window.createNewTest = function() {
+        editingTest = createEmptyTest();
+        currentTab = 'editor';
+        render();
+      };
+
+      window.editTest = function(id) {
+        editingTest = JSON.parse(JSON.stringify(Storage.getTest(id)));
+        currentTab = 'editor';
+        render();
+      };
+
+      window.confirmDeleteTest = function(id, title) {
+        showConfirmModal(`Удалить тест "${title}"?`, 'Все результаты этого теста также будут удалены.', () => {
+          Storage.deleteTest(id);
+          Utils.showNotification('Тест удалён', 'success');
+          render();
+        });
+      };
+
+      // ——— Editor ———
+      function createEmptyTest() {
+        return {
+          id: Storage.generateId(),
+          title: '',
+          description: '',
+          timeLimit: 300,
+          createdAt: Date.now(),
+          questions: [createEmptyQuestion()],
+        };
+      }
+
+      function createEmptyQuestion() {
+        return {
+          id: Storage.generateId(),
+          text: '',
+          options: ['', '', '', ''],
+          correct: 0,
+        };
+      }
+
+      function renderEditor() {
+        if (!editingTest) return;
+        const t = editingTest;
+        document.getElementById('tabContent').innerHTML = `
+          <div class="card" style="margin-bottom:20px;">
+            <div class="form-group">
+              <label>Название теста</label>
+              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="Например: JavaScript Основы">
+            </div>
+            <div class="form-group">
+              <label>Описание</label>
+              <textarea id="testDesc" class="form-control" rows="2" placeholder="Краткое описание теста">${Utils.escapeHtml(t.description || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Время на тест (секунды)</label>
+              <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:200px;">
+            </div>
+          </div>
+
+          <h3 style="margin-bottom:16px;">Вопросы (${t.questions.length})</h3>
+
+          <div id="questionsList">
+            ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
+          </div>
+
+          <button onclick="addQuestion()" class="btn btn-outline btn-block" style="margin:16px 0;">
+            + Добавить вопрос
+          </button>
+
+          <div style="display:flex; gap:12px; margin-top:20px;">
+            <button onclick="saveTest()" class="btn btn-primary btn-lg">Сохранить тест</button>
+            <button onclick="switchTab('tests')" class="btn btn-outline">Отмена</button>
+          </div>
+        `;
+
+        // Bind input listeners
+        document.getElementById('testTitle').addEventListener('input', (e) => { editingTest.title = e.target.value; });
+        document.getElementById('testDesc').addEventListener('input', (e) => { editingTest.description = e.target.value; });
+        document.getElementById('testTime').addEventListener('input', (e) => { editingTest.timeLimit = parseInt(e.target.value) || 300; });
+      }
+
+      function renderQuestionEditor(q, qi) {
+        return `
+          <div class="question-editor" data-qi="${qi}">
+            <div class="question-editor-header">
+              <strong>Вопрос ${qi + 1}</strong>
+              ${editingTest.questions.length > 1 ? `
+                <button class="remove-question-btn" onclick="removeQuestion(${qi})" title="Удалить вопрос">&#10006;</button>
+              ` : ''}
+            </div>
+            <div class="form-group">
+              <input type="text" class="form-control q-text" data-qi="${qi}"
+                     value="${Utils.escapeHtml(q.text)}" placeholder="Текст вопроса">
+            </div>
+            <div class="options-editor">
+              ${q.options.map((opt, oi) => `
+                <div class="option-editor-row">
+                  <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
+                         onchange="setCorrect(${qi}, ${oi})">
+                  <input type="text" class="form-control q-option" data-qi="${qi}" data-oi="${oi}"
+                         value="${Utils.escapeHtml(opt)}" placeholder="Вариант ${String.fromCharCode(65 + oi)}">
+                  <span class="correct-label">${q.correct === oi ? '&#9989;' : ''}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Use event delegation for question inputs
+      document.addEventListener('input', (e) => {
+        if (e.target.classList.contains('q-text')) {
+          const qi = parseInt(e.target.dataset.qi);
+          if (editingTest && editingTest.questions[qi]) {
+            editingTest.questions[qi].text = e.target.value;
+          }
+        }
+        if (e.target.classList.contains('q-option')) {
+          const qi = parseInt(e.target.dataset.qi);
+          const oi = parseInt(e.target.dataset.oi);
+          if (editingTest && editingTest.questions[qi]) {
+            editingTest.questions[qi].options[oi] = e.target.value;
+          }
+        }
+      });
+
+      window.setCorrect = function(qi, oi) {
+        if (editingTest && editingTest.questions[qi]) {
+          editingTest.questions[qi].correct = oi;
+          renderEditor();
+        }
+      };
+
+      window.addQuestion = function() {
+        editingTest.questions.push(createEmptyQuestion());
+        renderEditor();
+        // Scroll to new question
+        const list = document.getElementById('questionsList');
+        if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+      };
+
+      window.removeQuestion = function(qi) {
+        editingTest.questions.splice(qi, 1);
+        renderEditor();
+      };
+
+      window.saveTest = function() {
+        const t = editingTest;
+        if (!t.title.trim()) {
+          Utils.showNotification('Введите название теста', 'error');
+          return;
+        }
+        if (t.questions.some(q => !q.text.trim())) {
+          Utils.showNotification('Заполните текст всех вопросов', 'error');
+          return;
+        }
+        if (t.questions.some(q => q.options.some(o => !o.trim()))) {
+          Utils.showNotification('Заполните все варианты ответов', 'error');
+          return;
+        }
+
+        Storage.saveTest(t);
+        Utils.showNotification('Тест сохранён!', 'success');
+        editingTest = null;
+        currentTab = 'tests';
+        render();
+      };
+
+      // ——— Results ———
+      function renderResults() {
+        const tests = Storage.getTests();
+        const allResults = Storage.getResults();
+
+        document.getElementById('tabContent').innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <p style="color:var(--text-muted);">Всего попыток: ${allResults.length}</p>
+            ${allResults.length > 0 ? `
+              <button onclick="confirmClearResults()" class="btn btn-danger btn-sm">Очистить все результаты</button>
+            ` : ''}
+          </div>
+
+          ${tests.map(test => {
+            const results = Storage.getResultsForTest(test.id);
+            if (results.length === 0) return '';
+            return `
+              <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">${Utils.escapeHtml(test.title)} <span style="color:var(--text-muted); font-weight:400;">(${results.length} попыток)</span></div>
+                <table class="leaderboard-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align:center;">#</th>
+                      <th>Участник</th>
+                      <th>Группа</th>
+                      <th style="text-align:right;">Балл</th>
+                      <th style="text-align:right;">Время</th>
+                      <th style="text-align:right;">Дата</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${results.map((r, i) => `
+                      <tr>
+                        <td class="rank-cell rank-${i + 1}">${i + 1}</td>
+                        <td class="name-cell">${Utils.escapeHtml(r.userName)}</td>
+                        <td style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
+                        <td class="score-cell">${r.score}%</td>
+                        <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
+                        <td style="color:var(--text-muted); text-align:right; font-size:0.85rem;">${new Date(r.completedAt).toLocaleString('ru')}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `;
+          }).join('') || '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>Результатов пока нет.</p></div>'}
+        `;
+      }
+
+      window.confirmClearResults = function() {
+        showConfirmModal('Очистить все результаты?', 'Это действие нельзя отменить.', () => {
+          localStorage.removeItem('ct_results');
+          Utils.showNotification('Результаты очищены', 'success');
+          render();
+        });
+      };
+
+      // ——— Settings ———
+      function renderSettings() {
+        const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
+        document.getElementById('tabContent').innerHTML = `
+          <div class="card" style="max-width:500px;">
+            <div class="card-header">Настройки</div>
+            <div class="form-group">
+              <label>Пароль администратора</label>
+              <input type="text" id="adminPass" class="form-control" value="${Utils.escapeHtml(currentPassword)}">
+            </div>
+            <button onclick="saveSettings()" class="btn btn-primary">Сохранить</button>
+
+            <div style="margin-top:32px; padding-top:20px; border-top:1px solid var(--border);">
+              <h3 style="margin-bottom:12px; color:var(--danger);">Опасная зона</h3>
+              <button onclick="confirmResetAll()" class="btn btn-danger">Сбросить все данные</button>
+            </div>
+          </div>
+        `;
+      }
+
+      window.saveSettings = function() {
+        const pass = document.getElementById('adminPass').value.trim();
+        if (!pass) {
+          Utils.showNotification('Пароль не может быть пустым', 'error');
+          return;
+        }
+        localStorage.setItem('ct_admin_password', pass);
+        Utils.showNotification('Настройки сохранены!', 'success');
+      };
+
+      window.confirmResetAll = function() {
+        showConfirmModal('Сбросить ВСЕ данные?', 'Будут удалены все тесты, результаты и настройки. Это нельзя отменить!', () => {
+          localStorage.removeItem('ct_tests');
+          localStorage.removeItem('ct_results');
+          localStorage.removeItem('ct_sessions');
+          localStorage.removeItem('ct_admin_password');
+          Utils.showNotification('Все данные сброшены', 'success');
+          render();
+        });
+      };
+
+      // ——— Modal ———
+      function showConfirmModal(title, text, onConfirm) {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalText').textContent = text;
+        modal.classList.add('active');
+
+        const confirmBtn = document.getElementById('modalConfirm');
+        const cancelBtn = document.getElementById('modalCancel');
+
+        const cleanup = () => {
+          modal.classList.remove('active');
+          confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+          cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+        };
+
+        document.getElementById('modalConfirm').addEventListener('click', () => {
+          cleanup();
+          onConfirm();
+        });
+
+        document.getElementById('modalCancel').addEventListener('click', cleanup);
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) cleanup();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

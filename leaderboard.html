@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Рейтинг — TestArena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    (function() {
+      const user = Utils.requireAuth();
+      if (!user) return;
+
+      const selectedTestId = Utils.getQueryParam('test');
+      render();
+
+      function render() {
+        const tests = Storage.getTests();
+
+        document.getElementById('app').innerHTML = `
+          ${Utils.renderHeader(user, 'leaderboard')}
+          <div class="container fade-in">
+            <h2 style="margin:24px 0 16px;">Рейтинг участников</h2>
+
+            <div style="margin-bottom:24px;">
+              <div class="tabs">
+                <button class="tab ${!selectedTestId ? 'active' : ''}" onclick="window.location.href='leaderboard.html'">
+                  Общий
+                </button>
+                ${tests.map(t => `
+                  <button class="tab ${selectedTestId === t.id ? 'active' : ''}"
+                          onclick="window.location.href='leaderboard.html?test=${t.id}'">
+                    ${Utils.escapeHtml(t.title)}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div id="leaderboard-content">
+              ${selectedTestId ? renderTestLeaderboard(selectedTestId) : renderOverallLeaderboard()}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderTestLeaderboard(testId) {
+        const test = Storage.getTest(testId);
+        if (!test) return '<div class="empty-state"><p>Тест не найден</p></div>';
+
+        const results = Storage.getResultsForTest(testId);
+        if (results.length === 0) {
+          return `
+            <div class="empty-state">
+              <div class="empty-state-icon">&#127942;</div>
+              <p>Пока никто не прошёл этот тест. Будьте первым!</p>
+              <a href="test.html?id=${testId}" class="btn btn-primary" style="margin-top:16px;">Пройти тест</a>
+            </div>
+          `;
+        }
+
+        // Best result per user
+        const bestByUser = {};
+        results.forEach(r => {
+          if (!bestByUser[r.userName] || r.score > bestByUser[r.userName].score ||
+              (r.score === bestByUser[r.userName].score && r.timeSpent < bestByUser[r.userName].timeSpent)) {
+            bestByUser[r.userName] = r;
+          }
+        });
+
+        const sorted = Object.values(bestByUser).sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.timeSpent - b.timeSpent;
+        });
+
+        return `
+          <div class="card">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th style="text-align:center;">#</th>
+                  <th>Участник</th>
+                  <th>Группа</th>
+                  <th style="text-align:right;">Результат</th>
+                  <th style="text-align:right;">Время</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sorted.map((r, i) => `
+                  <tr class="${r.userName === user.name ? 'highlight-row' : ''}">
+                    <td class="rank-cell rank-${i + 1}">${i < 3 ? ['&#129351;', '&#129352;', '&#129353;'][i] : i + 1}</td>
+                    <td class="name-cell">${Utils.escapeHtml(r.userName)}</td>
+                    <td style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
+                    <td class="score-cell">${r.score}% <small style="color:var(--text-muted);">(${r.correctCount}/${r.totalQuestions})</small></td>
+                    <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function renderOverallLeaderboard() {
+        const allResults = Storage.getResults();
+        if (allResults.length === 0) {
+          return `
+            <div class="empty-state">
+              <div class="empty-state-icon">&#127942;</div>
+              <p>Результатов пока нет. Пройдите тест, чтобы попасть в рейтинг!</p>
+              <a href="tests.html" class="btn btn-primary" style="margin-top:16px;">К тестам</a>
+            </div>
+          `;
+        }
+
+        // Aggregate: average score per user across all tests
+        const userStats = {};
+        allResults.forEach(r => {
+          if (!userStats[r.userName]) {
+            userStats[r.userName] = {
+              name: r.userName,
+              group: r.userGroup,
+              totalScore: 0,
+              testsCompleted: 0,
+              totalTime: 0,
+              totalCorrect: 0,
+              totalQuestions: 0,
+            };
+          }
+          const s = userStats[r.userName];
+          s.totalScore += r.score;
+          s.testsCompleted++;
+          s.totalTime += r.timeSpent;
+          s.totalCorrect += r.correctCount;
+          s.totalQuestions += r.totalQuestions;
+        });
+
+        const sorted = Object.values(userStats)
+          .map(s => ({
+            ...s,
+            avgScore: Math.round(s.totalScore / s.testsCompleted),
+          }))
+          .sort((a, b) => {
+            if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore;
+            return a.totalTime - b.totalTime;
+          });
+
+        return `
+          <div class="card">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th style="text-align:center;">#</th>
+                  <th>Участник</th>
+                  <th>Группа</th>
+                  <th style="text-align:right;">Средний балл</th>
+                  <th style="text-align:right;">Тестов</th>
+                  <th style="text-align:right;">Общее время</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sorted.map((s, i) => `
+                  <tr class="${s.name === user.name ? 'highlight-row' : ''}">
+                    <td class="rank-cell rank-${i + 1}">${i < 3 ? ['&#129351;', '&#129352;', '&#129353;'][i] : i + 1}</td>
+                    <td class="name-cell">${Utils.escapeHtml(s.name)}</td>
+                    <td style="color:var(--text-muted);">${Utils.escapeHtml(s.group || '—')}</td>
+                    <td class="score-cell">${s.avgScore}%</td>
+                    <td style="text-align:right;">${s.testsCompleted}</td>
+                    <td class="time-cell">${Utils.formatTime(s.totalTime)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    })();
+  </script>
+</body>
+</html>
