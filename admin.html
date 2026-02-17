@@ -165,6 +165,8 @@
       }
 
       function initAdmin(user) {
+        let currentTab = 'tests';
+        let editingTest = null;
 
         function render() {
           // Custom Header for Admin
@@ -522,6 +524,8 @@
           newCancel.addEventListener('click', cleanup);
           modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
         }
+
+        render();
       } // end initAdmin
     })();
   </script>

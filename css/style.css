@@ -21,6 +21,10 @@
   --green: #26890C;
   --purple: #8854C0;
 
+  /* SEMANTIC ALIASES */
+  --primary: #1368CE;
+  --danger: #E21B3C;
+
   /* SHADOWS (Hard 3D Effect) */
   --red-shadow: #9F0F25;
   --blue-shadow: #0A4A99;
