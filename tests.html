@@ -1,15 +1,10 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test_Modules // TestArena</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
-    rel="stylesheet">
+  <title>Select Challenge // TestArena</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -33,15 +28,19 @@
       render();
 
       function render() {
-        // We can create a header with a logout button here too
+        // Header
         const headerHtml = `
-          <header style="padding: 24px 0; border-bottom: 2px solid var(--text); margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; text-transform: uppercase;">
-              TestArena <span style="color: var(--primary)">.</span>
+          <header style="padding: 20px 0; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.8rem; font-weight: 900; color: white; text-shadow: 0 2px 0 rgba(0,0,0,0.2);">
+              TestArena
             </div>
-            <div style="font-family: var(--font-mono); font-size: 0.9rem;">
-              UNIT: ${Utils.escapeHtml(user.name)}
-              <a href="#" onclick="Storage.logout()" style="margin-left: 12px; color: var(--danger); border-bottom: 1px solid currentColor;">EJECT</a>
+            <div style="display:flex; align-items:center; gap:15px;">
+              <div style="text-align:right; color:white;">
+                <div style="font-weight:900; font-size:1.1rem;">${Utils.escapeHtml(user.name)}</div>
+                <div style="font-size:0.8rem; opacity:0.8;">${Utils.escapeHtml(user.group || 'Player')}</div>
+              </div>
+              <div class="avatar">${user.name.charAt(0).toUpperCase()}</div>
+              <button onclick="Storage.logout()" class="btn btn-danger" style="padding: 8px 16px; font-size:0.9rem; margin-left:10px;">Quit</button>
             </div>
           </header>
         `;
@@ -50,47 +49,60 @@
         const userResults = Storage.getUserResults(user.name);
         const completedTestIds = new Set(userResults.map(r => r.testId));
 
+        // Colors for cards to cycle through
+        const colors = ['#E21B3C', '#1368CE', '#D89E00', '#26890C'];
+
+        // Battle Mode Button
+        const battleBtn = `
+          <a href="battle.html" class="btn btn-warning" style="font-size:1.2rem; transform:rotate(-2deg); box-shadow: 0 4px 0 #A67900;">
+            <span class="shape-icon shape-triangle" style="background:#333; width:20px; height:20px; vertical-align:middle; clip-path: polygon(50% 0%, 0% 100%, 100% 100%);"></span>
+            Battle Mode
+          </a>
+        `;
+
         document.getElementById('app').innerHTML = `
           ${headerHtml}
           <div class="fade-in">
-            <h2 style="margin:0 0 8px;">AVAILABLE_MODULES</h2>
-            <p class="mono" style="color:var(--text-muted); margin-bottom:40px;">SELECT SEQUENCE. COMPETE.</p>
+            <div style="display:flex; justify-content:space-between; align-items:end; margin-bottom:20px;">
+              <h1 style="text-align:left; margin:0; font-size:2.5rem; text-shadow:none;">Select Challenge</h1>
+              ${battleBtn}
+            </div>
 
             ${tests.length === 0 ? `
-              <div class="empty-state">
-                <div class="empty-state-icon">!</div>
-                <p>NO MODULES DETECTED. STANDBY.</p>
+              <div class="card empty-state" style="text-align:center; padding: 40px;">
+                <div style="font-size:4rem; margin-bottom:20px;">?</div>
+                <p style="font-size:1.5rem; font-weight:700;">No challenges available yet!</p>
               </div>
             ` : `
-              <div class="test-grid">
-                ${tests.map(test => {
+              <div class="test-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">
+                ${tests.map((test, index) => {
           const completed = completedTestIds.has(test.id);
           const results = Storage.getResultsForTest(test.id);
           const myResult = userResults.find(r => r.testId === test.id);
+          const color = colors[index % colors.length];
+
           return `
-                    <div class="test-card">
-                      <div>
-                        <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
-                        <div class="test-card-meta" style="flex-direction: column; gap: 4px; border-top:none; margin: 12px 0;">
-                          <span>Q_COUNT: ${test.questions.length}</span>
-                          <span>T_LIMIT: ${Utils.formatTime(test.timeLimit)}</span>
-                          <span>ATTEMPTS: ${results.length}</span>
+                    <div class="card" style="border-top: 8px solid ${color}; padding: 25px; display:flex; flex-direction:column; justify-content:space-between; min-height:220px;">
+                      <div style="margin-bottom:15px;">
+                        <h3 style="font-size:1.4rem; font-weight:900; margin-bottom:10px;">${Utils.escapeHtml(test.title)}</h3>
+                        <div style="display:flex; gap:10px; font-size:0.9rem; color:#666; font-weight:700;">
+                          <span style="background:#eee; padding:4px 8px; border-radius:4px;">${test.questions.length} Qs</span>
+                          <span style="background:#eee; padding:4px 8px; border-radius:4px;">${Utils.formatTime(test.timeLimit)}</span>
                         </div>
                       </div>
                       
                       ${completed
-              ? `<div style="margin-bottom:12px; font-family:var(--font-mono); font-weight:700; color:var(--success);">STATUS: COMPLETE (${myResult.score}%)</div>`
+              ? `<div style="margin-bottom:15px; color:${color}; font-weight:800; font-size:1.1rem;">COMPLETE: ${myResult.score}%</div>`
               : ''}
 
-                      <div class="test-card-actions" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button onclick="startTest('${test.id}')" class="btn ${completed ? 'btn-outline' : ''}" style="width:100%;">
-                          ${completed ? 'RETRY' : 'START'}
+                      <div style="display:grid; grid-template-columns: 1fr auto; gap: 10px;">
+                        <button onclick="startTest('${test.id}')" class="btn" style="background:${color}; color:white; width:100%;">
+                          ${completed ? 'Replay' : 'Play'}
                         </button>
-                        <a href="leaderboard.html?test=${test.id}" class="btn btn-outline" style="text-align:center; padding-top:16px;">RANKING</a>
+                        <a href="leaderboard.html?test=${test.id}" class="btn btn-outline" style="padding:0 15px;" title="Leaderboard">
+                          <span style="font-size:1.2rem;">🏆</span>
+                        </a>
                       </div>
-                      <a href="battle.html" class="btn btn-outline btn-block" style="margin-top:8px; border-color:var(--primary); color:var(--primary);">
-                        BATTLE MODE
-                      </a>
                     </div>
                   `;
         }).join('')}
@@ -100,9 +112,7 @@
         `;
       }
 
-      window.startTest = function (testId) {
-        window.location.href = `test.html?id=${testId}`;
-      };
+      window.startTest = function (testId) { window.location.href = `test.html?id=${testId}`; };
     })();
   </script>
 </body>

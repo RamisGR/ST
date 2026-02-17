@@ -1,19 +1,14 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test_Sequence // TestArena</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
-    rel="stylesheet">
+  <title>Challenge Mode // TestArena</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
-<body>
+<body class="center-content">
   <div id="app" class="container"></div>
 
   <!-- Firebase SDK -->
@@ -32,180 +27,128 @@
 
       const testId = Utils.getQueryParam('id');
       const test = Storage.getTest(testId);
+
       if (!test) {
-        document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'tests')}
-          <div class="container center-content">
-            <div class="empty-state">
-              <div class="empty-state-icon">!</div>
-              <p>MODULE NOT FOUND.</p>
-              <a href="tests.html" class="btn" style="margin-top:16px;">RETURN TO BASE</a>
-            </div>
-          </div>
-        `;
+        window.location.href = 'tests.html';
         return;
       }
 
-      // Test state
+      // Game State
       let currentQuestion = 0;
       let answers = new Array(test.questions.length).fill(-1);
       let timeLeft = test.timeLimit;
-      let startTime = Date.now();
+      let startTime = 0;
       let timerInterval = null;
       let finished = false;
 
-      // Show confirmation before starting
+      // Color/Shape mapping
+      const optionConfigs = [
+        { color: 'var(--red)', shape: 'shape-triangle', shadow: 'var(--red-shadow)', label: 'var(--red)' },
+        { color: 'var(--blue)', shape: 'shape-diamond', shadow: 'var(--blue-shadow)', label: 'var(--blue)' },
+        { color: 'var(--yellow)', shape: 'shape-circle', shadow: 'var(--yellow-shadow)', label: '#333' },
+        { color: 'var(--green)', shape: 'shape-square', shadow: 'var(--green-shadow)', label: 'white' }
+      ];
+
       showStartScreen();
 
       function showStartScreen() {
         document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'tests')}
-          <div class="container fade-in" style="max-width:800px;">
-            <div class="card" style="text-align:center; padding: 40px 20px; border-width: 4px;">
-              <h2 style="font-size: 3rem; margin-bottom:16px;">${Utils.escapeHtml(test.title)}</h2>
-              <p class="mono" style="color:var(--text-muted); margin-bottom:32px; max-width: 600px; margin-left: auto; margin-right: auto;">
-                ${Utils.escapeHtml(test.description || 'NO BRIEFING AVAILABLE')}
-              </p>
-              
-              <div class="test-card-meta" style="justify-content: center; gap: 32px; font-size: 1.2rem; margin-bottom: 40px; border-top: 1px solid var(--text); padding-top: 24px;">
-                <div style="text-align: center;">
-                  <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--font-display); line-height: 1;">${test.questions.length}</div>
-                  <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">Data Points</div>
-                </div>
-                <div style="text-align: center;">
-                  <div style="font-size: 2.5rem; font-weight: 800; font-family: var(--font-display); line-height: 1;">${Utils.formatTime(test.timeLimit)}</div>
-                  <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted);">Time Limit</div>
-                </div>
-              </div>
+          <div class="card fade-in" style="text-align:center; max-width:600px; width:100%; margin: 0 auto; border-top: 10px solid var(--primary);">
+            <h1 style="color:var(--text-main); text-shadow:none; margin-bottom:10px; font-size:2.5rem;">${Utils.escapeHtml(test.title)}</h1>
+            <p style="font-size:1.2rem; color:#666; margin-bottom:30px; font-weight:700;">
+              <span style="background:#eee; padding:5px 10px; border-radius:6px;">${test.questions.length} Questions</span>
+              <span style="background:#eee; padding:5px 10px; border-radius:6px;">${Utils.formatTime(test.timeLimit)}</span>
+            </p>
+            
+            <div style="font-size:6rem; margin-bottom:30px;">🚀</div>
 
-              <div style="background: var(--bg-secondary); padding: 16px; margin-bottom: 32px; display: inline-block;">
-                <p style="color:var(--text); font-size:0.9rem; font-family: var(--font-mono); font-weight: 700;">
-                  ⚠️ PROTOCOL: TIMER ACTIVE UPON INITIATION. NO PAUSE.
-                </p>
-              </div>
-
-              <button id="startBtn" class="btn btn-block" style="font-size: 1.2rem; padding: 20px;">[ INITIALIZE SEQUENCE ]</button>
-              <a href="tests.html" class="btn btn-outline btn-block" style="margin-top:12px; border: none;">ABORT</a>
-            </div>
+            <button id="startBtn" class="btn btn-primary btn-block" style="font-size:1.5rem; padding:20px; box-shadow: 0 6px 0 var(--blue-shadow);">Start Challenge</button>
+            <a href="tests.html" class="btn btn-outline btn-block" style="margin-top:15px; border:none; color:#888;">Cancel</a>
           </div>
         `;
-        document.getElementById('startBtn').addEventListener('click', () => {
-          startTime = Date.now();
-          const sessionId = Storage.generateId();
-          window._testSessionId = sessionId;
-          Storage.saveSession({
-            id: sessionId,
-            userName: user.name,
-            userGroup: user.group,
-            testId: test.id,
-            testTitle: test.title,
-            startedAt: startTime,
-          });
-          startTimer();
-          renderQuestion();
+        document.getElementById('startBtn').addEventListener('click', startTest);
+      }
+
+      function startTest() {
+        startTime = Date.now();
+        const sessionId = Storage.generateId();
+        window._testSessionId = sessionId;
+        Storage.saveSession({
+          id: sessionId,
+          userName: user.name,
+          userGroup: user.group,
+          testId: test.id,
+          testTitle: test.title,
+          startedAt: startTime,
         });
+
+        startTimer();
+        renderQuestion();
       }
 
       function startTimer() {
         timerInterval = setInterval(() => {
-          timeLeft--;
-          updateTimerDisplay();
-          if (timeLeft <= 0) {
-            finishTest();
+          if (!finished) {
+            timeLeft--;
+            const el = document.getElementById('timer');
+            if (el) {
+              el.textContent = timeLeft;
+              if (timeLeft <= 10) {
+                el.style.background = 'var(--red)';
+                el.style.animation = 'pulse 0.5s infinite';
+              }
+            }
+            if (timeLeft <= 0) finishTest();
           }
         }, 1000);
-      }
-
-      function updateTimerDisplay() {
-        const el = document.getElementById('timer');
-        if (!el) return;
-        el.textContent = Utils.formatTime(timeLeft);
-        if (timeLeft <= 30) el.style.color = 'var(--danger)';
-        else if (timeLeft <= 60) el.style.color = 'var(--warning)';
       }
 
       function renderQuestion() {
         if (finished) return;
         const q = test.questions[currentQuestion];
-        const progress = ((currentQuestion) / test.questions.length) * 100;
 
         document.getElementById('app').innerHTML = `
-          <div class="container slide-in" style="max-width:900px; padding-top: 40px;">
-            <div class="test-header" style="border-bottom: none; margin-bottom: 0;">
-              <div class="mono" style="font-size: 0.9rem; color: var(--text-muted);">
-                MODULE: ${Utils.escapeHtml(test.title)}
+          <div class="container slide-in" style="padding-top:20px; max-width:800px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+              <div style="color:white; font-weight:700; font-size:1.2rem; background:rgba(0,0,0,0.3); padding:5px 15px; border-radius:20px;">
+                ${currentQuestion + 1} / ${test.questions.length}
               </div>
-              <div id="timer" class="timer" style="font-variant-numeric: tabular-nums;">${Utils.formatTime(timeLeft)}</div>
+              <div id="timer" class="timer-circle" style="width:70px; height:70px; font-size:1.8rem; margin:0; box-shadow:0 0 15px rgba(0,0,0,0.3);">${timeLeft}</div>
+              <button onclick="finishTest()" style="background:rgba(255,255,255,0.2); border:none; color:white; font-weight:700; cursor:pointer; padding:8px 15px; border-radius:6px;">Quit</button>
             </div>
 
-            <div class="progress-bar-container" style="height: 2px; background: #eee; margin-bottom: 40px;">
-              <div class="progress-bar" style="width:${progress}%; transition: width 0.3s ease;"></div>
+            <div class="question-card" style="font-size:1.8rem; margin-bottom:30px; min-height:150px; display:flex; align-items:center; justify-content:center;">
+              ${Utils.escapeHtml(q.text)}
             </div>
 
-            <div class="question-container">
-              <div class="mono" style="margin-bottom: 16px; color: var(--primary); font-weight: 700;">
-                POINT ${currentQuestion + 1} / ${test.questions.length}
-              </div>
-              
-              <div class="question-text" style="font-weight: 800;">${Utils.escapeHtml(q.text)}</div>
-              
-              <div class="options-list">
-                ${q.options.map((opt, i) => `
-                  <button class="option-btn ${answers[currentQuestion] === i ? 'selected' : ''}"
-                          onclick="selectAnswer(${i})">
-                    <span class="mono" style="display:inline-block; width: 30px; opacity: 0.5;">0${i + 1}</span>
-                    <span style="font-weight: 500;">${Utils.escapeHtml(opt)}</span>
+            <div class="answer-grid" style="grid-template-columns: 1fr 1fr; gap:20px; height:auto;">
+              ${q.options.map((opt, i) => {
+          const cfg = optionConfigs[i % 4];
+          return `
+                  <button onclick="selectAnswer(${i})" class="btn pop-in" 
+                    style="background:${cfg.color}; border-bottom-color:${cfg.shadow}; color:white;
+                           height:120px; font-size:1.3rem; padding:20px; width:100%; display:flex; align-items:center; justify-content:center;
+                           text-align:center; white-space:normal; line-height:1.2;">
+                    <span class="shape-icon ${cfg.shape}" style="background:rgba(0,0,0,0.2); position:absolute; left:15px; top:15px;"></span>
+                    <span>${Utils.escapeHtml(opt)}</span>
                   </button>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="question-nav" style="margin-top: 60px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid var(--text); padding-top: 24px;">
-              <button onclick="prevQuestion()" class="btn btn-outline" ${currentQuestion === 0 ? 'disabled style="opacity:0; pointer-events:none;"' : ''}>
-                PREV
-              </button>
-
-              <div class="question-dots" style="display:flex; gap: 4px;">
-                ${test.questions.map((_, i) => `
-                  <div style="width: 8px; height: 8px; background: ${i === currentQuestion ? 'var(--primary)' : answers[i] >= 0 ? 'var(--text)' : '#ddd'};"></div>
-                `).join('')}
-              </div>
-
-              ${currentQuestion === test.questions.length - 1 ? `
-                <button onclick="confirmFinish()" class="btn" style="background: var(--primary); color: white;">COMPLETE</button>
-              ` : `
-                <button onclick="nextQuestion()" class="btn">NEXT</button>
-              `}
+                `;
+        }).join('')}
             </div>
           </div>
         `;
       }
 
       window.selectAnswer = function (index) {
+        if (finished) return;
         answers[currentQuestion] = index;
-        renderQuestion();
-      };
 
-      window.prevQuestion = function () {
-        if (currentQuestion > 0) {
-          currentQuestion--;
-          renderQuestion();
-        }
-      };
-
-      window.nextQuestion = function () {
         if (currentQuestion < test.questions.length - 1) {
           currentQuestion++;
           renderQuestion();
+        } else {
+          finishTest();
         }
-      };
-
-      window.confirmFinish = function () {
-        const unanswered = answers.filter(a => a === -1).length;
-        if (unanswered > 0) {
-          if (!confirm(`WARNING: ${unanswered} DATA POINTS MISSING. CONFIRM SUBMISSION?`)) return;
-        }
-        finishTest();
       };
 
       function finishTest() {
@@ -219,12 +162,7 @@
         const questionResults = test.questions.map((q, i) => {
           const isCorrect = answers[i] === q.correct;
           if (isCorrect) correctCount++;
-          return {
-            questionId: q.id,
-            selected: answers[i],
-            correct: q.correct,
-            isCorrect,
-          };
+          return { questionId: q.id, selected: answers[i], correct: q.correct, isCorrect };
         });
 
         const score = Math.round((correctCount / test.questions.length) * 100);
@@ -247,72 +185,52 @@
       }
 
       function showResults(result) {
-        const allResults = Storage.getResultsForTest(test.id);
-        const rank = allResults.findIndex(r => r.id === result.id) + 1;
+        const resultColor = result.score >= 70 ? 'var(--green)' : 'var(--red)';
+        const title = result.score >= 90 ? 'Legendary!' : result.score >= 70 ? 'Great Job!' : 'Keep Trying!';
 
         document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'tests')}
-          <div class="container fade-in" style="max-width:800px;">
-            <div class="card result-summary" style="text-align:center; padding: 40px; border-width: 4px;">
-              <h2 class="mono" style="font-size: 1rem; color: var(--text-muted); margin-bottom: 24px;">MISSION REPORT</h2>
+          <div class="container center-content fade-in">
+            <div class="card" style="text-align:center; max-width:500px; width:100%; border-top:10px solid ${resultColor}; padding:40px;">
+              <h1 style="color:#333; font-size:2.5rem; text-shadow:none; margin-bottom:10px;">${title}</h1>
               
-              <div class="result-score" style="margin-bottom: 0;">${result.score}%</div>
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 1.5rem; margin-bottom: 40px;">
-                ${result.score >= 90 ? 'EXCEPTIONAL' : result.score >= 70 ? 'SATISFACTORY' : 'SUBOPTIMAL'}
+              <div style="font-size:6rem; font-weight:900; color:${resultColor}; margin:20px 0; line-height:1;">
+                ${result.score}%
               </div>
 
-              <div class="result-details" style="justify-content: center; gap: 40px; border-top: 2px solid var(--text); padding-top: 32px;">
-                <div class="result-detail-item">
-                  <div class="value" style="font-size: 2rem;">${result.correctCount}/${result.totalQuestions}</div>
-                  <div class="label">ACCURACY</div>
+              <div style="display:flex; justify-content:center; gap:30px; font-size:1.2rem; font-weight:700; color:#666; margin-bottom:40px;">
+                <div style="background:#f5f5f5; padding:10px 20px; border-radius:10px;">
+                  <div style="font-size:0.9rem; text-transform:uppercase; color:#999;">Correct</div>
+                  <div>${result.correctCount}/${result.totalQuestions}</div>
                 </div>
-                <div class="result-detail-item">
-                  <div class="value" style="font-size: 2rem;">${Utils.formatTime(result.timeSpent)}</div>
-                  <div class="label">DURATION</div>
-                </div>
-                <div class="result-detail-item">
-                  <div class="value" style="font-size: 2rem; color: var(--primary);">#${rank}</div>
-                  <div class="label">RANKING</div>
+                <div style="background:#f5f5f5; padding:10px 20px; border-radius:10px;">
+                  <div style="font-size:0.9rem; text-transform:uppercase; color:#999;">Time</div>
+                  <div>${Utils.formatTime(result.timeSpent)}</div>
                 </div>
               </div>
-            </div>
 
-            <div class="card" style="margin-top:20px; border: none; background: transparent; padding: 0;">
-              <h3 style="margin-bottom: 24px; border-bottom: 2px solid var(--text); padding-bottom: 12px;">DEBRIEFING</h3>
-              ${test.questions.map((q, i) => {
-          const r = result.answers[i];
-          return `
-                  <div style="background: var(--bg); border: 2px solid var(--text); padding: 24px; margin-bottom: 16px;">
-                    <div class="mono" style="font-size: 0.8rem; margin-bottom: 8px;">
-                      DATA POINT ${i + 1} ${r.isCorrect ? '<span style="color:var(--success); font-weight:700;">// PASS</span>' : '<span style="color:var(--danger); font-weight:700;">// FAIL</span>'}
-                    </div>
-                    <div style="font-weight:700; font-size: 1.1rem; margin-bottom:16px;">${Utils.escapeHtml(q.text)}</div>
-                    <div class="options-list" style="grid-template-columns: 1fr;">
-                      ${q.options.map((opt, j) => {
-            let style = 'opacity: 0.6;';
-            let prefix = '';
-            if (j === q.correct) { style = 'opacity: 1; border: 2px solid var(--success); color: var(--success); font-weight: 700;'; prefix = '✓ '; }
-            if (j === r.selected && !r.isCorrect) { style = 'opacity: 1; border: 2px solid var(--danger); color: var(--danger); font-weight: 700;'; prefix = '✗ '; }
-
-            return `<div style="padding: 12px; border: 1px solid #ddd; ${style}">
-                          ${prefix}${Utils.escapeHtml(opt)}
-                        </div>`;
-          }).join('')}
-                    </div>
-                  </div>
-                `;
-        }).join('')}
-            </div>
-
-            <div style="display:flex; gap:12px; margin-top:40px; margin-bottom: 60px;">
-              <a href="leaderboard.html?test=${test.id}" class="btn btn-block">VIEW RANKING</a>
-              <a href="tests.html" class="btn btn-outline btn-block">RETURN TO BASE</a>
+              <a href="leaderboard.html?test=${test.id}" class="btn btn-primary btn-block" style="margin-bottom:15px; font-size:1.2rem; padding:18px;">View Leaderboard</a>
+              <a href="tests.html" class="btn btn-outline btn-block" style="border:2px solid #ddd; color:#888;">Back to Lobby</a>
             </div>
           </div>
         `;
       }
     })();
   </script>
+  <style>
+    @keyframes pulse {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+  </style>
 </body>
 
 </html>

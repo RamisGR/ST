@@ -1,63 +1,103 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Global_Ranking // TestArena</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
-    rel="stylesheet">
+  <title>Hall of Fame // TestArena</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-    .live-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      background: var(--primary);
-      margin-right: 6px;
-      animation: blink 1s infinite alternate;
-    }
-
-    @keyframes blink {
-      from {
-        opacity: 1;
-      }
-
-      to {
-        opacity: 0.3;
-      }
-    }
-
-    .live-bar {
-      border: 2px solid var(--primary);
-      background: var(--bg);
-      padding: 16px;
-      margin-bottom: 24px;
-    }
-
-    .live-bar-title {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-    }
-
-    .live-user {
+    .rank-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      border: 1px solid var(--text);
-      padding: 4px 8px;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      margin: 4px;
-      text-transform: uppercase;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-weight: 900;
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    .rank-1-badge {
+      background: #D89E00;
+      box-shadow: 0 3px 0 #A67900;
+    }
+
+    .rank-2-badge {
+      background: #C0C0C0;
+      box-shadow: 0 3px 0 #999;
+    }
+
+    .rank-3-badge {
+      background: #CD7F32;
+      box-shadow: 0 3px 0 #A05A18;
+    }
+
+    .rank-other-badge {
+      background: #eee;
+      color: #888;
+    }
+
+    .podium-container {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      height: 350px;
+      margin-bottom: 40px;
+      gap: 15px;
+    }
+
+    .battle-podium-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100px;
+    }
+
+    .podium-bar {
+      width: 100%;
+      border-top-left-radius: 10px;
+      border-top-right-radius: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 10px;
+      color: white;
+      font-weight: 900;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .podium-rank-1 {
+      height: 200px;
+      background: #D89E00;
+      order: 2;
+      z-index: 2;
+    }
+
+    .podium-rank-2 {
+      height: 140px;
+      background: #C0C0C0;
+      order: 1;
+    }
+
+    .podium-rank-3 {
+      height: 100px;
+      background: #CD7F32;
+      order: 3;
+    }
+
+    .rank-1 {
+      order: 2;
+      transform: translateY(-20px);
+    }
+
+    .rank-2 {
+      order: 1;
+    }
+
+    .rank-3 {
+      order: 3;
     }
   </style>
 </head>
@@ -83,15 +123,10 @@
       const selectedTestId = Utils.getQueryParam('test');
       let liveSessions = [];
 
-      // Initial render
+      // Initial render must happen before listeners to setup container
       render();
 
-      // Real-time: re-render leaderboard when results change
-      Storage.onResultsChange(() => {
-        renderLeaderboardContent();
-      });
-
-      // Real-time: track who is currently taking a test
+      Storage.onResultsChange(() => { renderLeaderboardContent(); });
       Storage.onSessionsChange((sessions) => {
         liveSessions = sessions;
         renderLiveBar();
@@ -101,31 +136,26 @@
         const tests = Storage.getTests();
 
         document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'leaderboard')}
-          <div class="container fade-in">
-            <div style="display:flex; align-items:center; justify-content: space-between; flex-wrap:wrap; margin:0 0 24px;">
-              <h2 style="margin:0;">GLOBAL_RANKING</h2>
-              ${Storage.isOnline() ? `
-                <div class="mono" style="font-size: 0.8rem; color: var(--primary);">
-                   ● LIVE_DATA_STREAM_ACTIVE
-                </div>
-              ` : ''}
-            </div>
+          <header style="padding: 20px 0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:1.5rem; font-weight:900; color:white; text-shadow:0 2px 0 rgba(0,0,0,0.2);">TestArena</div>
+            <a href="tests.html" class="btn btn-outline" style="border:none; color:white; background:rgba(255,255,255,0.2);">Back</a>
+          </header>
 
+          <div class="container fade-in">
+            <h1 style="margin-bottom:20px;">Hall of Fame</h1>
+            
             <div id="live-bar-container"></div>
 
-            <div style="margin-bottom:32px;">
-              <div class="tabs">
-                <button class="tab ${!selectedTestId ? 'active' : ''}" onclick="window.location.href='leaderboard.html'">
-                  OVERALL_STANDING
+            <div class="tabs" style="justify-content:center; flex-wrap:wrap; gap:10px; margin-bottom:30px;">
+              <button class="tab ${!selectedTestId ? 'active' : ''}" onclick="window.location.href='leaderboard.html'">
+                Global
+              </button>
+              ${tests.map(t => `
+                <button class="tab ${selectedTestId === t.id ? 'active' : ''}"
+                        onclick="window.location.href='leaderboard.html?test=${t.id}'">
+                  ${Utils.escapeHtml(t.title)}
                 </button>
-                ${tests.map(t => `
-                  <button class="tab ${selectedTestId === t.id ? 'active' : ''}"
-                          onclick="window.location.href='leaderboard.html?test=${t.id}'">
-                    ${Utils.escapeHtml(t.title)}
-                  </button>
-                `).join('')}
-              </div>
+              `).join('')}
             </div>
 
             <div id="leaderboard-content">
@@ -133,19 +163,16 @@
             </div>
           </div>
         `;
-      }
 
-      function renderLeaderboardContent() {
-        const el = document.getElementById('leaderboard-content');
-        if (!el) return;
-        el.innerHTML = selectedTestId ? renderTestLeaderboard(selectedTestId) : renderOverallLeaderboard();
+        // Render content immediately
+        renderLeaderboardContent();
+        renderLiveBar();
       }
 
       function renderLiveBar() {
         const container = document.getElementById('live-bar-container');
         if (!container) return;
 
-        // Filter sessions for current test (or all)
         const relevant = selectedTestId
           ? liveSessions.filter(s => s.testId === selectedTestId)
           : liveSessions;
@@ -156,17 +183,15 @@
         }
 
         container.innerHTML = `
-          <div class="live-bar">
-            <div class="live-bar-title">
-              <span class="live-indicator"></span>
-              ACTIVE_AGENTS [${relevant.length}]
+          <div style="background:white; padding:15px; border-radius:12px; margin-bottom:30px; text-align:center; box-shadow:0 6px 0 rgba(0,0,0,0.1);">
+            <div style="font-weight:900; color:var(--primary); margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;">
+              <span style="color:var(--red); animation:blink 1s infinite;">●</span> Live Now [${relevant.length}]
             </div>
-            <div>
+            <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:10px;">
               ${relevant.map(s => `
-                <span class="live-user">
-                  ${Utils.escapeHtml(s.userName)}
-                  ${s.testTitle ? `<span style="color:var(--text-muted); border-left: 1px solid var(--text-muted); padding-left: 6px; margin-left: 2px;">${Utils.escapeHtml(s.testTitle)}</span>` : ''}
-                </span>
+                <div class="avatar" style="width:40px; height:40px; font-size:1rem; border:none; background:#eee; color:#333;" title="${Utils.escapeHtml(s.userName)}">
+                  ${s.userName.charAt(0).toUpperCase()}
+                </div>
               `).join('')}
             </div>
           </div>
@@ -175,20 +200,13 @@
 
       function renderTestLeaderboard(testId) {
         const test = Storage.getTest(testId);
-        if (!test) return '<div class="empty-state"><p>MODULE NOT FOUND</p></div>';
+        if (!test) return '';
 
         const results = Storage.getResultsForTest(testId);
         if (results.length === 0) {
-          return `
-            <div class="empty-state">
-              <div class="empty-state-icon">!</div>
-              <p>NO DATA RECORDS.</p>
-              <a href="test.html?id=${testId}" class="btn" style="margin-top:16px;">INITIATE SEQUENCE</a>
-            </div>
-          `;
+          return `<div class="card empty-state" style="text-align:center; font-weight:700;">No scores yet. Be the first!</div>`;
         }
 
-        // Best result per user
         const bestByUser = {};
         results.forEach(r => {
           if (!bestByUser[r.userName] || r.score > bestByUser[r.userName].score ||
@@ -202,110 +220,115 @@
           return a.timeSpent - b.timeSpent;
         });
 
+        const top3 = sorted.slice(0, 3);
+
+        // Pad with nulls for layout if less than 3
+        const p1 = top3[0];
+        const p2 = top3[1] || null;
+        const p3 = top3[2] || null;
+
+        let podiumHtml = '';
+        if (p1) {
+          podiumHtml = `
+            <div class="podium-container">
+              ${p2 ? `
+                <div class="battle-podium-item rank-2">
+                  <div class="avatar" style="background:#C0C0C0; color:white; margin-bottom:10px; border:2px solid white;">${p2.userName.charAt(0)}</div>
+                  <div style="font-weight:700; color:white; margin-bottom:5px; text-shadow:0 2px 4px rgba(0,0,0,0.3);">${Utils.escapeHtml(p2.userName)}</div>
+                  <div class="podium-bar podium-rank-2 pop-in" style="animation-delay:0.2s;">
+                    <span>#2</span>
+                  </div>
+                </div>
+              ` : ''}
+              
+              <div class="battle-podium-item rank-1">
+                <div class="avatar" style="background:#D89E00; color:white; margin-bottom:10px; width:70px; height:70px; font-size:2rem; border:4px solid white;">${p1.userName.charAt(0)}</div>
+                <div style="font-weight:700; color:white; margin-bottom:5px; font-size:1.2rem; text-shadow:0 2px 4px rgba(0,0,0,0.3);">
+                  ${Utils.escapeHtml(p1.userName)}
+                  <div style="font-size:0.9rem; opacity:0.9;">${p1.score}%</div>
+                </div>
+                <div class="podium-bar podium-rank-1 pop-in">
+                  <span style="font-size:2rem;">🏆</span>
+                </div>
+              </div>
+
+              ${p3 ? `
+                <div class="battle-podium-item rank-3">
+                  <div class="avatar" style="background:#CD7F32; color:white; margin-bottom:10px; border:2px solid white;">${p3.userName.charAt(0)}</div>
+                  <div style="font-weight:700; color:white; margin-bottom:5px; text-shadow:0 2px 4px rgba(0,0,0,0.3);">${Utils.escapeHtml(p3.userName)}</div>
+                  <div class="podium-bar podium-rank-3 pop-in" style="animation-delay:0.4s;">
+                    <span>#3</span>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }
+
         return `
-          <div class="card">
+          ${podiumHtml}
+          <div class="card" style="margin-top:20px; padding:0;">
             <table class="leaderboard-table">
-              <thead>
-                <tr>
-                  <th style="text-align:center;">RANK</th>
-                  <th>AGENT</th>
-                  <th>UNIT</th>
-                  <th style="text-align:right;">RATING</th>
-                  <th style="text-align:right;">TIME</th>
+              <tr>
+                <th style="width:80px; text-align:center;">Rank</th>
+                <th>Player</th>
+                <th>Group</th>
+                <th style="text-align:right;">Score</th>
+              </tr>
+              ${sorted.map((r, i) => `
+                <tr style="${r.userName === user.name ? 'background:#f0fbfd; font-weight:bold;' : ''}">
+                  <td style="text-align:center;">
+                    <span class="rank-badge ${i === 0 ? 'rank-1-badge' : i === 1 ? 'rank-2-badge' : i === 2 ? 'rank-3-badge' : 'rank-other-badge'}" style="width:30px; height:30px; font-size:1rem;">${i + 1}</span>
+                  </td>
+                  <td>${Utils.escapeHtml(r.userName)}</td>
+                  <td style="color:#888;">${Utils.escapeHtml(r.userGroup || '-')}</td>
+                  <td style="text-align:right; font-weight:900; color:${r.score >= 90 ? 'var(--green)' : 'var(--text-main)'};">${r.score}%</td>
                 </tr>
-              </thead>
-              <tbody>
-                ${sorted.map((r, i) => `
-                  <tr class="${r.userName === user.name ? 'highlight-row' : ''}" style="${r.userName === user.name ? 'background: var(--bg-secondary);' : ''}">
-                    <td class="rank-cell rank-${i + 1}">${i + 1}</td>
-                    <td class="name-cell" style="font-weight: 700;">${Utils.escapeHtml(r.userName)}</td>
-                    <td class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(r.userGroup || '—')}</td>
-                    <td class="score-cell">${r.score}% <small class="mono" style="color:var(--text-muted); font-size: 0.8em;">(${r.correctCount}/${r.totalQuestions})</small></td>
-                    <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
+              `).join('')}
             </table>
           </div>
-          <p class="mono" style="color:var(--text-muted); font-size:0.8rem; margin-top:12px; text-transform:uppercase;">
-            Displaying optimal performance records. Total attempts: ${results.length}
-          </p>
         `;
       }
 
       function renderOverallLeaderboard() {
         const allResults = Storage.getResults();
-        if (allResults.length === 0) {
-          return `
-            <div class="empty-state">
-              <div class="empty-state-icon">!</div>
-              <p>NO RECORDS FOUND.</p>
-              <a href="tests.html" class="btn" style="margin-top:16px;">VIEW MODULES</a>
-            </div>
-          `;
-        }
+        if (allResults.length === 0) return `<div class="card empty-state">No records yet.</div>`;
 
-        // Aggregate: average score per user across all tests
         const userStats = {};
         allResults.forEach(r => {
-          if (!userStats[r.userName]) {
-            userStats[r.userName] = {
-              name: r.userName,
-              group: r.userGroup,
-              totalScore: 0,
-              testsCompleted: 0,
-              totalTime: 0,
-              totalCorrect: 0,
-              totalQuestions: 0,
-            };
-          }
-          const s = userStats[r.userName];
-          s.totalScore += r.score;
-          s.testsCompleted++;
-          s.totalTime += r.timeSpent;
-          s.totalCorrect += r.correctCount;
-          s.totalQuestions += r.totalQuestions;
+          if (!userStats[r.userName]) userStats[r.userName] = { name: r.userName, totalScore: 0, count: 0 };
+          userStats[r.userName].totalScore += r.score;
+          userStats[r.userName].count++;
         });
 
         const sorted = Object.values(userStats)
-          .map(s => ({
-            ...s,
-            avgScore: Math.round(s.totalScore / s.testsCompleted),
-          }))
-          .sort((a, b) => {
-            if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore;
-            return a.totalTime - b.totalTime;
-          });
+          .map(s => ({ ...s, avg: Math.round(s.totalScore / s.count) }))
+          .sort((a, b) => b.avg - a.avg);
 
         return `
-          <div class="card">
+          <div class="card" style="padding:0;">
+            <h3 style="padding:20px; margin:0; text-align:center; border-bottom:1px solid #eee;">Overall Legends</h3>
             <table class="leaderboard-table">
-              <thead>
-                <tr>
-                  <th style="text-align:center;">RANK</th>
-                  <th>AGENT</th>
-                  <th>UNIT</th>
-                  <th style="text-align:right;">AVG_RATING</th>
-                  <th style="text-align:right;">L_COUNT</th>
-                  <th style="text-align:right;">TOTAL_TIME</th>
+              <tr><th style="text-align:center;">Rank</th><th>Player</th><th style="text-align:right;">Avg Score</th></tr>
+              ${sorted.map((s, i) => `
+                <tr style="${s.name === user.name ? 'background:#f0fbfd; font-weight:bold;' : ''}">
+                   <td style="text-align:center;">
+                     <span class="rank-badge ${i < 3 ? 'rank-' + (i + 1) + '-badge' : 'rank-other-badge'}" style="width:30px; height:30px; font-size:1rem;">${i + 1}</span>
+                   </td>
+                   <td>${Utils.escapeHtml(s.name)}</td>
+                   <td style="text-align:right; font-weight:900;">${s.avg}%</td>
                 </tr>
-              </thead>
-              <tbody>
-                ${sorted.map((s, i) => `
-                  <tr class="${s.name === user.name ? 'highlight-row' : ''}" style="${s.name === user.name ? 'background: var(--bg-secondary);' : ''}">
-                    <td class="rank-cell rank-${i + 1}">${i + 1}</td>
-                    <td class="name-cell" style="font-weight: 700;">${Utils.escapeHtml(s.name)}</td>
-                    <td class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(s.group || '—')}</td>
-                    <td class="score-cell">${s.avgScore}%</td>
-                    <td class="mono" style="text-align:right;">${s.testsCompleted}</td>
-                    <td class="time-cell">${Utils.formatTime(s.totalTime)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
+              `).join('')}
             </table>
           </div>
         `;
       }
+
+      function renderLeaderboardContent() {
+        const el = document.getElementById('leaderboard-content');
+        if (el) el.innerHTML = selectedTestId ? renderTestLeaderboard(selectedTestId) : renderOverallLeaderboard();
+      }
+
     })();
   </script>
 </body>

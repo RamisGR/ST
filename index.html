@@ -1,124 +1,64 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TestArena — Digital Proving Ground</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+  <title>TestArena - Game Lobby</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <div id="app" class="container"></div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<body class="center-content">
+  <div id="app" class="container">
+    <div class="hero fade-in">
+      <h1>TestArena</h1>
+      <div class="card" style="max-width: 400px; margin: 0 auto; transform: rotate(-1deg);">
+        <div style="text-align:center; color: #888; font-weight: 700; margin-bottom: 20px; text-transform:uppercase;">
+          Enter Nickname
+        </div>
 
-  <script src="js/firebase-config.js"></script>
-  <script src="js/sample-tests.js"></script>
+        <form id="loginForm">
+          <div class="form-group">
+            <input type="text" id="username" class="form-control" placeholder="Nickname" required maxlength="15"
+              autocomplete="off" style="font-size: 1.5rem; text-align:center;">
+          </div>
+          <div class="form-group">
+            <input type="text" id="group" class="form-control" placeholder="Group (Optional)" maxlength="10"
+              autocomplete="off" style="text-align:center;">
+          </div>
+          <button type="submit" class="btn btn-block btn-primary" style="font-size: 1.2rem; padding: 20px;">Enter
+            Lobby</button>
+        </form>
+      </div>
+
+      <div style="margin-top: 30px; text-align: center;">
+        <a href="admin.html"
+          style="color: rgba(255,255,255,0.5); font-weight: 700; font-size: 0.9rem; text-decoration: none; border: none;">Teacher
+          Login &rarr;</a>
+      </div>
+    </div>
+  </div>
+
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
-    Storage.initFirebase();
-    (function() {
-      const user = Storage.getUser();
-      if (user) {
+    // Check if logged in
+    const user = Storage.getUser();
+    if (user) {
+      window.location.href = 'tests.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const name = document.getElementById('username').value.trim();
+      const group = document.getElementById('group').value.trim();
+
+      if (name) {
+        Storage.setUser({ name, group, role: 'student' });
         window.location.href = 'tests.html';
-        return;
       }
-      render();
-
-      function render() {
-        document.getElementById('app').innerHTML = `
-          <div class="hero fade-in">
-            <h1>TestArena<span style="color:var(--primary)">.</span></h1>
-            <p class="mono" style="font-size: 1.2rem; max-width: 600px;">
-              DIGITAL PROVING GROUND.<br>
-              COMPETE. RANK. EVOLVE.
-            </p>
-          </div>
-
-          <div class="login-card card fade-in" style="animation-delay: 0.1s; max-width: 500px; margin: 0 auto;">
-            <div class="card-header">
-              <span>Login Protocol</span>
-              <span>V.2.0</span>
-            </div>
-            <form id="loginForm">
-              <div class="form-group">
-                <label for="name">Identifier (Name)</label>
-                <input type="text" id="name" class="form-control" placeholder="NAME_SURNAME" required maxlength="50">
-              </div>
-              <div class="form-group">
-                <label for="group">Unit (Group)</label>
-                <input type="text" id="group" class="form-control" placeholder="GROUP_ID" maxlength="30">
-              </div>
-              <button type="submit" class="btn btn-block">Initialize Session</button>
-            </form>
-            <div style="margin-top: var(--gap); padding-top: var(--gap); border-top: 2px solid var(--text); text-align: center;">
-              <button id="adminBtn" class="btn btn-outline btn-sm">Admin Access</button>
-            </div>
-          </div>
-        `;
-
-        document.getElementById('loginForm').addEventListener('submit', (e) => {
-          e.preventDefault();
-          const name = document.getElementById('name').value.trim();
-          const group = document.getElementById('group').value.trim();
-          if (!name) return;
-
-          Storage.setUser({ name, group, role: 'student' });
-          window.location.href = 'tests.html';
-        });
-
-        document.getElementById('adminBtn').addEventListener('click', () => {
-          showAdminLogin();
-        });
-      }
-
-      function showAdminLogin() {
-        document.getElementById('app').innerHTML = `
-          <div class="hero fade-in">
-            <h2>Admin<span style="color:var(--primary)">_</span>Console</h2>
-          </div>
-
-          <div class="login-card card fade-in" style="max-width: 500px; margin: 0 auto;">
-            <div class="card-header">
-              <span>Security Clearance</span>
-              <span>REQ_AUTH</span>
-            </div>
-            <form id="adminForm">
-              <div class="form-group">
-                <label for="adminPass">Access Code</label>
-                <input type="password" id="adminPass" class="form-control" placeholder="********" required>
-              </div>
-              <p class="mono" style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: var(--gap);">
-                DEFAULT: <span style="background:var(--bg-secondary); padding: 2px 6px;">admin</span>
-              </p>
-              <button type="submit" class="btn btn-block" style="background: var(--primary); color: white;">Authenticate</button>
-              <button type="button" id="backBtn" class="btn btn-outline btn-block" style="margin-top: 12px;">Abort</button>
-            </form>
-          </div>
-        `;
-
-        document.getElementById('adminForm').addEventListener('submit', (e) => {
-          e.preventDefault();
-          const pass = document.getElementById('adminPass').value;
-          const adminPassword = localStorage.getItem('ct_admin_password') || 'admin';
-          if (pass === adminPassword) {
-            Storage.setUser({ name: 'Administrator', group: 'ROOT', role: 'admin' });
-            window.location.href = 'admin.html';
-          } else {
-            Utils.showNotification('ACCESS DENIED', 'error');
-          }
-        });
-
-        document.getElementById('backBtn').addEventListener('click', () => {
-          render();
-        });
-      }
-    })();
+    });
   </script>
 </body>
+
 </html>

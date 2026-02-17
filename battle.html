@@ -1,34 +1,29 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battle_Mode // TestArena</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
-    rel="stylesheet">
+  <title>Battle Mode // TestArena</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-    .battle-glow {
-      animation: textGlow 2s infinite alternate;
+    .avatar-bounce {
+      animation: bounce 1s infinite alternate;
     }
 
-    @keyframes textGlow {
+    @keyframes bounce {
       from {
-        text-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+        transform: translateY(0);
       }
 
       to {
-        text-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+        transform: translateY(-10px);
       }
     }
   </style>
 </head>
 
-<body>
+<body class="center-content">
   <div id="app" class="container"></div>
 
   <!-- Firebase SDK -->
@@ -55,238 +50,127 @@
       let timerInterval = null;
       let timeLeft = 0;
       let testStartTime = 0;
-      let questionStartTimes = [];
       let showingIntermediateResults = false;
-      let intermediateShownAt = new Set(); // track which checkpoints we've shown
-      let joinLock = false; // prevent double-joining
+      let joinLock = false;
 
-      if (!Storage.isOnline()) {
-        document.getElementById('app').innerHTML = `
-          <div class="hero fade-in">
-            <h1 class="battle-glow">OFFLINE_MODE_DETECTED</h1>
-            <div class="card" style="max-width:500px;margin:0 auto;text-align:center;">
-              <p style="color:var(--danger);font-family:var(--font-mono);">NETWORK CONNECTION REQUIRED FOR BATTLE MODE.</p>
-              <a href="tests.html" class="btn" style="margin-top:20px;">RETURN TO BASE</a>
-            </div>
-          </div>
-        `;
-        return;
-      }
+      // Color/Shape mapping
+      const optionConfigs = [
+        { color: 'var(--red)', shape: 'shape-triangle', shadow: 'var(--red-shadow)' },
+        { color: 'var(--blue)', shape: 'shape-diamond', shadow: 'var(--blue-shadow)' },
+        { color: 'var(--yellow)', shape: 'shape-circle', shadow: 'var(--yellow-shadow)' },
+        { color: 'var(--green)', shape: 'shape-square', shadow: 'var(--green-shadow)' }
+      ];
 
-      // If we have a room code, go directly to join/lobby
       if (roomParam) {
         showJoinScreen(roomParam);
       } else {
         showCreateOrJoin();
       }
 
-      // ============ SCREENS ============
-
       function showCreateOrJoin() {
         const tests = Storage.getTests();
         document.getElementById('app').innerHTML = `
-          ${user ? Utils.renderHeader(user, 'battle') : ''}
-          <div class="container fade-in" style="max-width:800px;">
-            <div style="text-align:center;margin:30px 0 40px;">
-              <h1 class="battle-glow" style="font-size:3rem; margin-bottom: 8px;">BATTLE_MODE</h1>
-              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">Real-time competitive assessment protocol</p>
-            </div>
+          <div class="container fade-in" style="text-align:center; max-width:800px; padding-top:40px;">
+            <h1 style="font-size:3.5rem; margin-bottom:10px; text-shadow:none; color:white;">Battle Mode</h1>
+            <p style="font-size:1.5rem; color:rgba(255,255,255,0.8); margin-bottom:40px;">Compete live with others!</p>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-              <div class="card" style="margin-bottom:0;">
-                <div class="card-header">INITIATE_SESSION</div>
-                ${!user ? `
-                  <div class="form-group">
-                    <label for="creatorName">OPERATOR_NAME</label>
-                    <input type="text" id="creatorName" class="form-control" placeholder="ENTER IDENTIFIER" -required maxlength="50">
-                  </div>
-                  <div class="form-group">
-                    <label for="creatorGroup">UNIT (OPTIONAL)</label>
-                    <input type="text" id="creatorGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
-                  </div>
-                ` : ''}
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-bottom:30px;">
+              <div class="card" style="border-top:10px solid var(--blue); text-align:left;">
+                <h2 style="color:#333; font-size:1.8rem; margin-bottom:20px;">Host Game</h2>
                 <div class="form-group">
-                  <label for="testSelect">SELECT_MODULE</label>
-                  <select id="testSelect" class="form-control" style="font-family:var(--font-mono);">
-                    ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)} [${t.questions.length} PTS]</option>`).join('')}
+                  <label>Select Challenge</label>
+                  <select id="testSelect" class="form-control" style="font-size:1rem;">
+                    ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)}</option>`).join('')}
                   </select>
                 </div>
-                <button id="createBtn" class="btn btn-block" style="background:var(--primary); color:white; margin-top:24px;">CREATE ROOM</button>
-              </div>
-
-              <div class="card" style="margin-bottom:0;">
-                <div class="card-header">JOIN_SESSION</div>
                 ${!user ? `
                   <div class="form-group">
-                    <label for="joinName">OPERATOR_NAME</label>
-                    <input type="text" id="joinName" class="form-control" placeholder="ENTER IDENTIFIER" required maxlength="50">
-                  </div>
-                  <div class="form-group">
-                    <label for="joinGroup">UNIT (OPTIONAL)</label>
-                    <input type="text" id="joinGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
+                    <label>Your Name</label>
+                    <input id="creatorName" class="form-control" placeholder="Prof. X">
                   </div>
                 ` : ''}
+                <button id="createBtn" class="btn btn-primary btn-block" style="background:var(--blue); border-bottom:4px solid var(--blue-shadow);">Create Room</button>
+              </div>
+
+              <div class="card" style="border-top:10px solid var(--green); text-align:left;">
+                <h2 style="color:#333; font-size:1.8rem; margin-bottom:20px;">Join Game</h2>
                 <div class="form-group">
-                  <label for="roomCode">ACCESS_CODE</label>
-                  <input type="text" id="roomCode" class="form-control" placeholder="X-X-X-X" maxlength="6" style="text-transform:uppercase;font-size:1.5rem;text-align:center;letter-spacing:6px;font-weight:700; font-family:var(--font-mono);">
+                  <label>Room PIN</label>
+                  <input id="roomCode" class="form-control" placeholder="123456" maxlength="6" style="letter-spacing:5px; font-size:1.5rem; text-align:center; font-weight:700;">
                 </div>
-                <button id="joinBtn" class="btn btn-outline btn-block" style="margin-top:24px;">CONNECT</button>
+                ${!user ? `
+                  <div class="form-group">
+                    <label>Your Name</label>
+                    <input id="joinName" class="form-control" placeholder="Player 1">
+                  </div>
+                ` : ''}
+                <button id="joinBtn" class="btn btn-primary btn-block" style="background:var(--green); border-bottom:4px solid var(--green-shadow);">Enter Room</button>
               </div>
             </div>
+            
+            <a href="tests.html" class="btn btn-outline" style="margin-top:20px; border:none; color:white;">Back to Menu</a>
           </div>
         `;
 
-        document.getElementById('createBtn').addEventListener('click', function () {
-          this.disabled = true;
-          this.textContent = 'INITIALIZING...';
-          let name, group;
-          if (user) {
-            name = user.name;
-            group = user.group;
-          } else {
-            name = document.getElementById('creatorName').value.trim();
-            group = document.getElementById('creatorGroup') ? document.getElementById('creatorGroup').value.trim() : '';
-            if (!name) { alert('NAME REQUIRED'); this.disabled = false; this.textContent = 'CREATE ROOM'; return; }
-            Storage.setUser({ name, group, role: 'student' });
-          }
+        document.getElementById('createBtn').addEventListener('click', () => {
           const testId = document.getElementById('testSelect').value;
-          const test = Storage.getTest(testId);
-          if (!test) { alert('MODULE NOT FOUND'); this.disabled = false; this.textContent = 'CREATE ROOM'; return; }
+          const name = user ? user.name : document.getElementById('creatorName').value.trim();
+          if (!name) return alert('Name required');
 
+          if (!user) Storage.setUser({ name, role: 'student' });
+
+          const test = Storage.getTest(testId);
           const b = Storage.createBattle(testId, test.title, test.questions.length, test.timeLimit, name);
-          myPlayerId = Storage.joinBattle(b.id, name, group);
-          joinLock = true;
+
+          myPlayerId = Storage.joinBattle(b.id, name, user ? user.group : '');
           localStorage.setItem('battle_player_id', myPlayerId);
           localStorage.setItem('battle_room', b.id);
           localStorage.setItem('battle_is_creator', 'true');
 
-          // Update URL without reload
           history.replaceState(null, '', 'battle.html?room=' + b.id);
           showLobby(b.id);
         });
 
-        document.getElementById('joinBtn').addEventListener('click', function () {
+        document.getElementById('joinBtn').addEventListener('click', () => {
           const code = document.getElementById('roomCode').value.trim().toUpperCase();
-          if (!code || code.length < 4) { alert('INVALID CODE'); return; }
-          this.disabled = true;
-          this.textContent = 'CONNECTING...';
+          const name = user ? user.name : document.getElementById('joinName').value.trim();
+          if (!code || !name) return alert('PIN and Name required');
+
+          if (!user) Storage.setUser({ name, role: 'student' });
           showJoinScreen(code);
         });
       }
 
       function showJoinScreen(roomCode) {
-        // Check if we're already in this room
         const savedRoom = localStorage.getItem('battle_room');
         const savedPlayerId = localStorage.getItem('battle_player_id');
+
         if (savedRoom === roomCode && savedPlayerId) {
           myPlayerId = savedPlayerId;
           showLobby(roomCode);
           return;
         }
 
-        // Need to join
-        let name, group;
-        if (user) {
-          name = user.name;
-          group = user.group || '';
-        } else {
-          // Show name input
-          document.getElementById('app').innerHTML = `
-            <div class="hero fade-in">
-              <h1 class="battle-glow">AUTHENTICATION</h1>
-              <p class="mono" style="color:var(--text-muted);">TARGET_SESSION: <strong style="color:var(--primary);">${Utils.escapeHtml(roomCode)}</strong></p>
-              <div class="card" style="max-width:420px;margin:20px auto 0;">
-                <div class="card-header">OPERATOR_DETAILS</div>
-                <div class="form-group">
-                  <label for="playerName">OPERATOR_NAME</label>
-                  <input type="text" id="playerName" class="form-control" placeholder="ENTER IDENTIFIER" required maxlength="50">
-                </div>
-                <div class="form-group">
-                  <label for="playerGroup">UNIT (OPTIONAL)</label>
-                  <input type="text" id="playerGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
-                </div>
-                <button id="enterBtn" class="btn btn-primary btn-block">JOIN SESSION</button>
-              </div>
-            </div>
-          `;
-          document.getElementById('enterBtn').addEventListener('click', function () {
-            const n = document.getElementById('playerName').value.trim();
-            const g = document.getElementById('playerGroup').value.trim();
-            if (!n) { alert('NAME REQUIRED'); return; }
-            this.disabled = true;
-            this.textContent = 'CONNECTING...';
-            Storage.setUser({ name: n, group: g, role: 'student' });
-            doJoin(roomCode, n, g);
-          });
-          return;
-        }
-        doJoin(roomCode, name, group);
-      }
+        const name = user ? user.name : prompt("Enter your nickname:");
+        if (!name) return;
 
-      function doJoin(roomCode, name, group) {
-        // Prevent double-join
-        if (joinLock || myPlayerId) {
-          if (myPlayerId) showLobby(roomCode);
-          return;
-        }
-        joinLock = true;
+        if (!user) Storage.setUser({ name, role: 'student' });
 
-        // One-time check if room exists (NOT a persistent listener)
-        Storage.getBattleOnce(roomCode, (data) => {
-          if (!data) {
-            joinLock = false;
-            document.getElementById('app').innerHTML = `
-              <div class="hero fade-in">
-                <h1>SESSION_NOT_FOUND</h1>
-                <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
-                  <p class="mono" style="color:var(--danger);">SESSION ${Utils.escapeHtml(roomCode)} INVALID OR EXPIRED.</p>
-                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">RETURN</a>
-                </div>
-              </div>
-            `;
-            return;
-          }
-
-          if (data.status !== 'waiting') {
-            joinLock = false;
-            document.getElementById('app').innerHTML = `
-              <div class="hero fade-in">
-                <h1>SESSION_LOCKED</h1>
-                <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
-                  <p class="mono" style="color:var(--warning);">SESSION IN PROGRESS OR COMPLETED.</p>
-                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">NEW SESSION</a>
-                </div>
-              </div>
-            `;
-            return;
-          }
-
-          // Double-check myPlayerId hasn't been set while waiting for Firebase
-          if (myPlayerId) {
-            joinLock = false;
-            showLobby(roomCode);
-            return;
-          }
-
-          myPlayerId = Storage.joinBattle(roomCode, name, group);
-          localStorage.setItem('battle_player_id', myPlayerId);
-          localStorage.setItem('battle_room', roomCode);
-          localStorage.setItem('battle_is_creator', 'false');
-
-          showLobby(roomCode);
-        });
+        myPlayerId = Storage.joinBattle(roomCode, name, user ? user.group : '');
+        localStorage.setItem('battle_player_id', myPlayerId);
+        localStorage.setItem('battle_room', roomCode);
+        localStorage.setItem('battle_is_creator', 'false');
+        showLobby(roomCode);
       }
 
       function showLobby(roomCode) {
         const isCreator = localStorage.getItem('battle_is_creator') === 'true';
 
-        // Listen to battle changes
         if (battleRef) Storage.offBattleChange(battleRef);
         battleRef = Storage.onBattleChange(roomCode, (data) => {
           if (!data) return;
           battle = data;
 
-          // If battle started, transition to countdown/test
           if (data.status === 'countdown' && !showingIntermediateResults) {
             showCountdown(roomCode);
             return;
@@ -300,97 +184,65 @@
             return;
           }
 
-          // Render lobby
           renderLobby(roomCode, data, isCreator);
         });
       }
 
       function renderLobby(roomCode, data, isCreator) {
         const players = data.players ? Object.values(data.players) : [];
-        const shareUrl = window.location.origin + window.location.pathname + '?room=' + roomCode;
 
         document.getElementById('app').innerHTML = `
-          ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
-          <div class="container fade-in" style="max-width:600px;">
-            <div style="text-align:center;margin:20px 0;">
-              <h2 class="battle-glow" style="margin-bottom:8px;">WAITING FOR DEPLOYMENT</h2>
-              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">MODULE: <strong>${Utils.escapeHtml(data.testTitle)}</strong></p>
-            </div>
+          <div class="container fade-in" style="text-align:center; padding-top:40px;">
+             <div class="card" style="width:auto; display:inline-block; padding:10px 30px; margin-bottom:30px; border-radius:10px;">
+               <div style="font-size:1rem; color:#888; font-weight:700;">GAME PIN</div>
+               <div style="font-size:4rem; font-weight:900; letter-spacing:5px;">${roomCode}</div>
+             </div>
+             
+             <h2 style="color:white; margin-bottom:30px; font-size:2rem;">Waiting for players...</h2>
+             
+             <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:20px; margin-bottom:40px; min-height:100px;">
+               ${players.map((p, i) => `
+                 <div class="avatar-bounce" style="text-align:center; animation-delay:${i * 0.1}s;">
+                   <div class="avatar" style="width:60px; height:60px; font-size:1.5rem; background:white; color:#333; margin:0 auto 10px;">
+                     ${p.name.charAt(0).toUpperCase()}
+                   </div>
+                   <div style="color:white; font-weight:700; font-size:1rem; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                     ${Utils.escapeHtml(p.name)}
+                   </div>
+                 </div>
+               `).join('')}
+             </div>
 
-            <div class="card battle-room-card" style="text-align:center;margin-bottom:20px; border:2px dashed var(--text-muted);">
-              <div style="margin-bottom:24px;">
-                <div class="mono" style="color:var(--text-muted);font-size:0.8rem;margin-bottom:8px;">SESSION_CODE</div>
-                <div class="room-code-display" style="font-family:var(--font-mono); font-size:3rem; letter-spacing:8px; font-weight:700; color:var(--primary); line-height:1;">${roomCode}</div>
-              </div>
-              <div style="margin-bottom:8px;">
-                <div class="mono" style="color:var(--text-muted);font-size:0.8rem;margin-bottom:4px;">SECURE_LINK</div>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <input type="text" value="${shareUrl}" class="form-control" style="font-size:0.8rem;text-align:center; font-family:var(--font-mono);" readonly id="shareUrl">
-                  <button onclick="copyLink()" class="btn btn-sm btn-outline" id="copyBtn">COPY</button>
-                </div>
-              </div>
-            </div>
+             <div style="color:rgba(255,255,255,0.7); font-weight:700; font-size:1.5rem; margin-bottom:40px;">
+               ${players.length} Player${players.length !== 1 ? 's' : ''} Ready
+             </div>
 
-            <div class="card" style="margin-bottom:20px;">
-              <div class="card-header">OPERATORS_DETECTED [${players.length}]</div>
-              <div class="battle-players-list">
-                ${players.map((p, i) => `
-                  <div class="battle-player-item" style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border);">
-                    <div class="battle-player-avatar" style="width:32px; height:32px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-mono);">${p.name.charAt(0).toUpperCase()}</div>
-                    <div>
-                      <div style="font-weight:700;">${Utils.escapeHtml(p.name)}</div>
-                      ${p.group ? `<div class="mono" style="color:var(--text-muted);font-size:0.7rem;">${Utils.escapeHtml(p.group)}</div>` : ''}
-                    </div>
-                    ${p.name === data.createdBy ? '<span class="mono" style="margin-left:auto; font-size:0.7rem; color:var(--primary); border:1px solid var(--primary); padding:2px 6px;">HOST</span>' : ''}
-                  </div>
-                `).join('')}
-              </div>
-              ${players.length < 2 ? `
-                <p class="mono" style="color:var(--text-muted);text-align:center;margin-top:24px;font-size:0.8rem;">
-                  // AWAITING ADDITIONAL OPERATORS...
-                </p>
-              ` : ''}
-            </div>
-
-            ${isCreator ? `
-              <button id="startBattleBtn" class="btn btn-block btn-lg" style="background:var(--success); color:var(--bg);" ${players.length < 2 ? 'disabled style="opacity:0.5;"' : ''}>
-                INITIATE SEQUENCE [${players.length} READY]
-              </button>
-            ` : `
-              <div style="text-align:center;color:var(--text-muted);padding:20px;">
-                <div class="battle-waiting-pulse" style="width:10px; height:10px; background:var(--primary); border-radius:50%; margin:0 auto 12px; animation:blink 1s infinite;"></div>
-                <div class="mono" style="font-size:0.9rem;">AWAITING HOST SIGNAL...</div>
-              </div>
-            `}
+             ${isCreator ? `
+               <button id="startBtn" class="btn btn-primary" style="font-size:1.8rem; padding:20px 60px; box-shadow: 0 8px 0 var(--blue-shadow);">Start Game</button>
+             ` : `
+               <div style="color:white; font-size:1.2rem; background:rgba(0,0,0,0.2); padding:20px; border-radius:10px; display:inline-block;">
+                 Host will start the game soon...
+               </div>
+             `}
           </div>
         `;
 
-        if (isCreator && players.length >= 2) {
-          document.getElementById('startBattleBtn').addEventListener('click', () => {
-            Storage.startBattle(roomCode);
-          });
+        if (isCreator) {
+          document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode));
         }
       }
-
-      window.copyLink = function () {
-        const input = document.getElementById('shareUrl');
-        input.select();
-        navigator.clipboard.writeText(input.value).then(() => {
-          document.getElementById('copyBtn').textContent = 'COPIED';
-          setTimeout(() => document.getElementById('copyBtn').textContent = 'COPY', 2000);
-        }).catch(() => {
-          document.execCommand('copy');
-          document.getElementById('copyBtn').textContent = 'COPIED';
-        });
-      };
 
       function showCountdown(roomCode) {
         let count = 3;
         const render = () => {
+          const colors = ['var(--red)', 'var(--yellow)', 'var(--green)'];
           document.getElementById('app').innerHTML = `
-            <div class="battle-countdown-screen" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:80vh;">
-              <div class="battle-countdown-number ${count === 0 ? 'go' : ''}" style="font-size:10rem; font-weight:900; font-family:var(--font-display); line-height:1;">${count === 0 ? 'GO' : count}</div>
-              <p class="mono" style="color:var(--text-muted);margin-top:20px; text-transform:uppercase;">${battle.testTitle}</p>
+            <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <div style="font-size:15rem; font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s;">${count === 0 ? 'GO!' : count}</div>
+              <h2 style="color:white; margin-top:20px; font-size:2rem; text-align:center; max-width:800px;">${Utils.escapeHtml(battle.testTitle)}</h2>
+              ${count > 0 ? `<div style="width:100%; position:fixed; bottom:0; height:10px; background:rgba(255,255,255,0.2);">
+                <div style="width:${(count / 3) * 100}%; height:100%; background:white; transition:width 1s linear;"></div>
+              </div>` : ''}
             </div>
           `;
         };
@@ -406,439 +258,198 @@
       }
 
       function startBattleTest(roomCode) {
-        if (timerInterval) return; // already started
+        if (timerInterval) return;
         testData = Storage.getTest(battle.testId);
         if (!testData) return;
 
         answers = new Array(testData.questions.length).fill(-1);
-        questionStartTimes = new Array(testData.questions.length).fill(0);
         currentQuestion = 0;
         timeLeft = testData.timeLimit;
         testStartTime = Date.now();
-        questionStartTimes[0] = Date.now();
-        showingIntermediateResults = false;
-        intermediateShownAt = new Set();
 
         timerInterval = setInterval(() => {
           timeLeft--;
-          updateBattleTimer();
-          if (timeLeft <= 0) {
-            finishBattleTest(roomCode);
-          }
+          if (timeLeft <= 0) finishBattleTest(roomCode);
+          else renderBattleQuestion(roomCode); // Update timer UI efficienty? Ideally separate but this is fine for now
         }, 1000);
 
         renderBattleQuestion(roomCode);
       }
 
-      function updateBattleTimer() {
-        const el = document.getElementById('battle-timer');
-        if (!el) return;
-        el.textContent = Utils.formatTime(timeLeft);
-        if (timeLeft <= 30) el.style.color = 'var(--danger)';
-        else if (timeLeft <= 60) el.style.color = 'var(--warning)';
-      }
-
       function renderBattleQuestion(roomCode) {
         if (showingIntermediateResults) return;
         const q = testData.questions[currentQuestion];
-        const progress = ((currentQuestion) / testData.questions.length) * 100;
         const players = battle && battle.players ? Object.values(battle.players) : [];
 
-        // Build mini player progress indicators
-        const playersProgress = players.map(p => {
-          const pct = Math.round((p.answeredCount / testData.questions.length) * 100);
-          const isMe = p.id === myPlayerId;
-          return `<div class="battle-mini-player ${isMe ? 'me' : ''}" title="${Utils.escapeHtml(p.name)}" style="flex:1; margin-right:4px;">
-            <div style="font-size:0.7rem; margin-bottom:2px;" class="mono">${p.name.charAt(0)}</div>
-            <div class="battle-mini-bar" style="height:4px; background:var(--bg-secondary); position:relative;">
-                <div class="battle-mini-fill" style="position:absolute; top:0; left:0; height:100%; width:${pct}%; background:${isMe ? 'var(--primary)' : 'var(--text-muted)'};"></div>
-            </div>
-          </div>`;
-        }).join('');
-
         document.getElementById('app').innerHTML = `
-          <div class="battle-test-header" style="display:flex; justify-content:space-between; align-items:center; padding: 20px 0; border-bottom: 2px solid var(--text); margin-bottom: 20px;">
-            <div class="battle-test-info">
-              <span class="badge mono" style="background:var(--danger); color:white; padding:2px 6px;">LIVE_COMBAT</span>
-              <span style="font-weight:700; margin-left:12px;">${Utils.escapeHtml(testData.title)}</span>
-            </div>
-            <div id="battle-timer" class="timer" style="font-variant-numeric:tabular-nums; font-weight:700;">${Utils.formatTime(timeLeft)}</div>
-          </div>
-
-          <div class="battle-players-progress" style="display:flex; margin-bottom:40px;">${playersProgress}</div>
-
-          <div class="container slide-in" style="max-width:900px;">
-            <div class="progress-bar-container" style="height:2px; background:var(--bg-secondary); margin-bottom:40px;">
-              <div class="progress-bar" style="width:${progress}%; height:100%; background:var(--text); transition:width 0.3s ease;"></div>
+          <div class="container center-content" style="max-width:900px; padding-top:20px; width:100%;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center; margin-bottom:20px;">
+               <div style="background:rgba(0,0,0,0.3); color:white; padding:5px 15px; border-radius:20px; font-weight:700;">
+                 ${currentQuestion + 1} / ${testData.questions.length}
+               </div>
+               <div class="timer-circle" style="margin:0; width:60px; height:60px; font-size:1.5rem; background:white; color:#333;">${timeLeft}</div>
             </div>
 
-            <div class="question-container">
-               <div class="mono" style="margin-bottom: 16px; color: var(--primary); font-weight: 700;">
-                TARGET ${currentQuestion + 1} / ${testData.questions.length}
-              </div>
-              <div class="question-text" style="font-weight:800; margin-bottom:32px;">${Utils.escapeHtml(q.text)}</div>
-              <div class="options-list" style="display:grid; gap:12px;">
-                ${q.options.map((opt, i) => `
-                  <button class="option-btn ${answers[currentQuestion] === i ? 'selected' : ''}"
-                          onclick="battleSelectAnswer(${i})" style="text-align:left; padding:16px;">
-                    <span class="mono" style="opacity:0.5; margin-right:12px;">0${i + 1}</span> ${Utils.escapeHtml(opt)}
+            <div class="question-card" style="width:100%; min-height:180px; display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:30px; text-align:center;">
+              ${Utils.escapeHtml(q.text)}
+            </div>
+
+            <div class="answer-grid" style="width:100%; gap:20px;">
+              ${q.options.map((opt, i) => {
+          const cfg = optionConfigs[i % 4];
+          const isSelected = answers[currentQuestion] === i;
+          const opacity = (answers[currentQuestion] !== -1 && !isSelected) ? '0.4' : '1';
+
+          return `
+                  <button onclick="selectAnswer(${i})" class="btn pop-in" 
+                    style="background:${cfg.color}; border-bottom-color:${cfg.shadow}; color:white; opacity:${opacity};
+                           height:140px; font-size:1.4rem; padding:20px; width:100%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.2;">
+                    <span class="shape-icon ${cfg.shape}" style="background:rgba(0,0,0,0.2); position:absolute; left:15px; top:15px; width:40px; height:40px;"></span>
+                    <span>${Utils.escapeHtml(opt)}</span>
                   </button>
-                `).join('')}
-              </div>
+                `;
+        }).join('')}
             </div>
 
-            <div class="question-nav" style="margin-top:60px; display:flex; justify-content:space-between; padding-top:24px; border-top:2px solid var(--text);">
-              <button onclick="battlePrev()" class="btn btn-outline btn-sm" ${currentQuestion === 0 ? 'disabled style="opacity:0;pointer-events:none"' : ''}>
-                PREV_TARGET
-              </button>
-              
-              <div style="display:flex; gap:4px;">
-                 ${testData.questions.map((_, i) => `
-                  <div style="width: 6px; height: 6px; background: ${i === currentQuestion ? 'var(--primary)' : answers[i] >= 0 ? 'var(--text)' : '#ddd'};"></div>
-                `).join('')}
-              </div>
-
-              ${currentQuestion === testData.questions.length - 1 ? `
-                <button onclick="battleFinish()" class="btn btn-primary btn-sm">EXECUTE</button>
-              ` : `
-                <button onclick="battleNext()" class="btn btn-sm">NEXT_TARGET</button>
-              `}
+            <!-- Mini Leaderboard / Progress -->
+            <div style="margin-top:30px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+              ${players.map(p => {
+          const isMe = p.id === myPlayerId;
+          const score = p.correctCount || 0;
+          return `
+                   <div style="text-align:center; opacity:${p.finished ? 0.6 : 1}; margin:5px;">
+                     <div class="avatar" style="width:40px; height:40px; font-size:1rem; border:2px solid ${isMe ? 'yellow' : 'transparent'}; background:${isMe ? 'white' : 'rgba(255,255,255,0.2)'}; color:${isMe ? '#333' : 'white'}; margin:0 auto 5px;">
+                       ${p.name.charAt(0)}
+                     </div>
+                     <div style="color:white; font-size:0.8rem; font-weight:700;">${score}</div>
+                   </div>
+                 `;
+        }).join('')}
             </div>
           </div>
         `;
-        updateBattleTimer();
       }
 
-      window.battleSelectAnswer = function (index) {
-        const wasUnanswered = answers[currentQuestion] === -1;
+      window.selectAnswer = function (index) {
+        if (answers[currentQuestion] !== -1) return; // Already answered
+
         answers[currentQuestion] = index;
 
-        // Track correct count
-        const q = testData.questions[currentQuestion];
-        let correctCount = 0;
-        let answeredCount = 0;
-        answers.forEach((a, i) => {
-          if (a >= 0) {
-            answeredCount++;
-            if (a === testData.questions[i].correct) correctCount++;
-          }
-        });
-
-        // Update Firebase
-        const roomCode = localStorage.getItem('battle_room');
-        Storage.updateBattlePlayer(roomCode, myPlayerId, {
-          currentQuestion: currentQuestion,
-          correctCount: correctCount,
-          answeredCount: answeredCount,
-          ['answers/' + currentQuestion]: {
-            selected: index,
-            isCorrect: index === q.correct,
-            answeredAt: Date.now(),
-          }
-        });
-
-        // Check if we need intermediate results (every 5 answered questions)
-        const checkpoint = Math.floor(answeredCount / 5) * 5;
-        if (answeredCount > 0 && answeredCount % 5 === 0 && !intermediateShownAt.has(checkpoint) && answeredCount < testData.questions.length) {
-          intermediateShownAt.add(checkpoint);
-          showIntermediateResults(roomCode, checkpoint);
-          return;
-        }
-
-        renderBattleQuestion(roomCode);
-      };
-
-      window.battlePrev = function () {
-        if (currentQuestion > 0) {
-          currentQuestion--;
-          questionStartTimes[currentQuestion] = Date.now();
-          renderBattleQuestion(localStorage.getItem('battle_room'));
-        }
-      };
-
-      window.battleNext = function () {
-        if (currentQuestion < testData.questions.length - 1) {
-          currentQuestion++;
-          questionStartTimes[currentQuestion] = questionStartTimes[currentQuestion] || Date.now();
-          renderBattleQuestion(localStorage.getItem('battle_room'));
-        }
-      };
-
-      window.battleFinish = function () {
-        const unanswered = answers.filter(a => a === -1).length;
-        if (unanswered > 0) {
-          if (!confirm('WARNING: ' + unanswered + ' TARGETS REMAINING. CONFIRM EXECUTION?')) return;
-        }
-        finishBattleTest(localStorage.getItem('battle_room'));
-      };
-
-      function showIntermediateResults(roomCode, checkpoint) {
-        showingIntermediateResults = true;
-        const players = battle && battle.players ? Object.values(battle.players) : [];
-
-        // Sort by correct count desc, then by speed
-        const sorted = players.slice().sort((a, b) => {
-          if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
-          return a.answeredCount - b.answeredCount;
-        });
-
-        const renderIntermediate = () => {
-          const medals = ['1ST', '2ND', '3RD'];
-          document.getElementById('app').innerHTML = `
-            <div class="battle-intermediate-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; bg:rgba(255,255,255,0.95); z-index:100; display:flex; align-items:center; justify-content:center;">
-              <div class="card fade-in" style="width:100%; max-width:500px; border:4px solid var(--text);">
-                <div style="text-align:center;margin-bottom:20px;">
-                  <h2 class="mono" style="color:var(--primary); text-transform:uppercase;">CHECKPOINT [${checkpoint}]</h2>
-                  <p class="mono" style="color:var(--text-muted);">STATUS REPORT</p>
-                </div>
-
-                <div class="battle-standings">
-                  ${sorted.map((p, i) => {
-            const isMe = p.id === myPlayerId;
-            return `
-                      <div class="battle-standing-row ${isMe ? 'is-me' : ''}" style="display:flex; align-items:center; padding:12px; border-bottom:1px solid #eee; ${isMe ? 'background:var(--bg-secondary); font-weight:700;' : ''}">
-                        <div class="mono" style="width:40px; font-weight:700;">${i < 3 ? medals[i] : (i + 1)}</div>
-                        <div style="flex:1;">${Utils.escapeHtml(p.name)}</div>
-                        <div class="mono" style="text-align:right;">
-                          <span style="color:var(--success); font-weight:700;">${p.correctCount}</span>
-                        </div>
-                      </div>
-                    `;
-          }).join('')}
-                </div>
-
-                <div style="text-align:center;margin-top:24px;">
-                  <button id="continueBtn" class="btn btn-primary btn-block">RESUME <span id="countdownSec">(7)</span></button>
-                </div>
-              </div>
-            </div>
-          `;
-
-          // Auto-continue after 7 seconds
-          let sec = 7;
-          const countdownEl = document.getElementById('countdownSec');
-          const autoClose = setInterval(() => {
-            sec--;
-            if (countdownEl) countdownEl.textContent = '(' + sec + ')';
-            if (sec <= 0) {
-              clearInterval(autoClose);
-              closeIntermediate();
-            }
-          }, 1000);
-
-          document.getElementById('continueBtn').addEventListener('click', () => {
-            clearInterval(autoClose);
-            closeIntermediate();
-          });
-        };
-
-        const closeIntermediate = () => {
-          showingIntermediateResults = false;
-          renderBattleQuestion(roomCode);
-        };
-
-        renderIntermediate();
-      }
-
-      function finishBattleTest(roomCode) {
-        if (!testData) return;
-        clearInterval(timerInterval);
-        timerInterval = null;
-
-        const timeSpent = Math.round((Date.now() - testStartTime) / 1000);
+        // Calculate correctness
         let correctCount = 0;
         answers.forEach((a, i) => {
           if (a >= 0 && a === testData.questions[i].correct) correctCount++;
         });
 
+        Storage.updateBattlePlayer(localStorage.getItem('battle_room'), myPlayerId, {
+          currentQuestion: currentQuestion,
+          correctCount: correctCount,
+          answeredCount: answers.filter(a => a >= 0).length
+        });
+
+        // Delay for visual feedback before next question
+        setTimeout(() => {
+          if (currentQuestion < testData.questions.length - 1) {
+            currentQuestion++;
+            renderBattleQuestion(localStorage.getItem('battle_room'));
+          } else {
+            finishBattleTest(localStorage.getItem('battle_room'));
+          }
+        }, 500);
+      };
+
+      function finishBattleTest(roomCode) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+
+        let correctCount = 0;
+        answers.forEach((a, i) => {
+          if (a >= 0 && a === testData.questions[i].correct) correctCount++;
+        });
+
+        const timeSpent = Math.round((Date.now() - testStartTime) / 1000);
+
         Storage.updateBattlePlayer(roomCode, myPlayerId, {
           finished: true,
           finishedAt: Date.now(),
-          timeSpent: timeSpent,
           correctCount: correctCount,
-          answeredCount: answers.filter(a => a >= 0).length,
+          timeSpent: timeSpent
         });
 
-        // Also save as regular result
-        const score = Math.round((correctCount / testData.questions.length) * 100);
-        const result = {
-          id: Storage.generateId(),
-          testId: testData.id,
-          testTitle: testData.title,
-          userName: Storage.getUser().name,
-          userGroup: Storage.getUser().group || '',
-          score,
-          correctCount,
-          totalQuestions: testData.questions.length,
-          timeSpent,
-          answers: testData.questions.map((q, i) => ({
-            questionId: q.id,
-            selected: answers[i],
-            correct: q.correct,
-            isCorrect: answers[i] === q.correct,
-          })),
-          completedAt: Date.now(),
-          battleRoom: roomCode,
-        };
-        Storage.saveResult(result);
+        // Wait screen
+        document.getElementById('app').innerHTML = `
+           <div class="container fade-in center-content" style="text-align:center;">
+             <h1 style="color:white; font-size:3rem; margin-bottom:20px;">Finished!</h1>
+             <div class="card" style="display:inline-block; min-width:300px;">
+               <div style="font-size:1.2rem; color:#888;">Your Score</div>
+               <div style="font-size:4rem; font-weight:900; color:var(--primary);">${correctCount}/${testData.questions.length}</div>
+             </div>
+             <p style="color:rgba(255,255,255,0.8); font-size:1.5rem; margin-top:30px;">Waiting for other players...</p>
+             <div class="battle-waiting-pulse" style="margin:20px auto; background:white;"></div>
+           </div>
+         `;
 
-        showWaitingForOthers(roomCode);
-      }
-
-      function showWaitingForOthers(roomCode) {
-        // Listen for all players to finish
-        const checkFinished = () => {
-          if (!battle || !battle.players) return;
-          const players = Object.values(battle.players);
-          const allDone = players.every(p => p.finished);
-          if (allDone) {
-            Storage.finishBattle(roomCode);
-          }
-        };
-
-        // Re-render waiting screen with live data
-        const renderWaiting = () => {
-          if (!battle) return;
-          const players = Object.values(battle.players || {});
-          const finished = players.filter(p => p.finished).length;
-          const total = players.length;
-
-          if (battle.status === 'finished') {
-            showFinalResults(roomCode);
-            return;
-          }
-
-          document.getElementById('app').innerHTML = `
-            <div class="container fade-in" style="max-width:600px;text-align:center;margin-top:60px;">
-              <h2 style="margin-bottom:16px;">MISSION COMPLETE</h2>
-              <p class="mono" style="color:var(--text-muted);margin-bottom:40px;">AWAITING ALL UNITS...</p>
-
-              <div class="card">
-                <div class="battle-waiting-players">
-                  ${players.map(p => `
-                    <div class="battle-waiting-player" style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
-                      <div class="battle-player-avatar" style="width:30px; height:30px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; margin-right:12px; font-weight:700;">${p.name.charAt(0).toUpperCase()}</div>
-                      <span style="font-weight:700;">${Utils.escapeHtml(p.name)}</span>
-                      ${p.finished
-              ? '<span class="mono" style="color:var(--success);margin-left:auto; font-size:0.8rem;">READY</span>'
-              : '<span class="mono" style="color:var(--text-muted);margin-left:auto; font-size:0.8rem;">ACTIVE...</span>'}
-                    </div>
-                  `).join('')}
-                </div>
-
-                <div style="margin-top:20px;color:var(--text-muted);" class="mono">
-                  ${finished} / ${total} REPORTING
-                </div>
-              </div>
-            </div>
-          `;
-
-          checkFinished();
-        };
-
-        // Update on battle changes
-        if (battleRef) Storage.offBattleChange(battleRef);
-        battleRef = Storage.onBattleChange(roomCode, (data) => {
-          battle = data;
-          renderWaiting();
-        });
+        // Host checks if all finished
+        const isCreator = localStorage.getItem('battle_is_creator') === 'true';
+        if (isCreator) {
+          const checkAll = setInterval(() => {
+            if (!battle || !battle.players) return;
+            const players = Object.values(battle.players);
+            if (players.every(p => p.finished)) {
+              clearInterval(checkAll);
+              Storage.finishBattle(roomCode);
+            }
+          }, 1000);
+        }
       }
 
       function showFinalResults(roomCode) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        showingIntermediateResults = false;
-
         if (!battle || !battle.players) return;
-        const players = Object.values(battle.players);
-        testData = testData || Storage.getTest(battle.testId);
+        const players = Object.values(battle.players).sort((a, b) => b.correctCount - a.correctCount);
+        const top3 = players.slice(0, 3);
 
-        // Sort by correct count desc, then by time spent asc
-        const sorted = players.slice().sort((a, b) => {
-          if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
-          return (a.timeSpent || 9999) - (b.timeSpent || 9999);
-        });
-
-        const topCount = Math.min(sorted.length, 3);
-        const medals = ['1', '2', '3']; // Minimalist
-
-        // Build podium (reorder for visual: 2nd, 1st, 3rd)
-        let podiumOrder = [];
-        if (topCount >= 2) podiumOrder.push({ ...sorted[1], rank: 1 });
-        podiumOrder.push({ ...sorted[0], rank: 0 });
-        if (topCount >= 3) podiumOrder.push({ ...sorted[2], rank: 2 });
-        // If only 1 player
-        if (topCount === 1) podiumOrder = [{ ...sorted[0], rank: 0 }];
-
-        const totalQ = testData ? testData.questions.length : (battle.questionsCount || '?');
+        // p1 is index 0. p2 index 1. p3 index 2.
+        const p1 = top3[0];
+        const p2 = top3[1];
+        const p3 = top3[2];
 
         document.getElementById('app').innerHTML = `
-          ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
-          <div class="container fade-in" style="max-width:800px;">
-            <div style="text-align:center;margin:30px 0 40px;">
-              <h1 class="battle-glow" style="margin-bottom:8px;">DEBRIEFING</h1>
-              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(battle.testTitle)}</p>
-            </div>
+          <div class="container fade-in" style="text-align:center; padding-top:40px;">
+            <h1 style="color:white; text-shadow:none; font-size:3rem; margin-bottom:40px;">Podium</h1>
+            
+            <div class="podium-container" style="display:flex; align-items:flex-end; justify-content:center; gap:10px; height:350px; margin-bottom:40px;">
+              ${p2 ? `
+                <div class="podium-bar pop-in" style="animation-delay:0.2s; width:100px; display:flex; flex-direction:column; align-items:center;">
+                   <div class="avatar" style="margin-bottom:10px; background:#C0C0C0; color:white; width:60px; height:60px; font-size:1.5rem; border:3px solid white;">${p2.name.charAt(0)}</div>
+                   <div style="background:#C0C0C0; width:100%; height:180px; border-radius:10px 10px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px; font-weight:900; color:white; font-size:2rem; box-shadow:0 4px 0 rgba(0,0,0,0.2);">2</div>
+                   <div style="background:white; color:#333; width:100%; padding:8px 5px; font-weight:700; border-radius:0 0 5px 5px; font-size:0.9rem;">${Utils.escapeHtml(p2.name)}</div>
+                   <div style="color:white; font-weight:700; margin-top:5px;">${p2.correctCount} pts</div>
+                </div>
+              ` : ''}
 
-            <div class="battle-podium">
-              ${podiumOrder.map(p => {
-          const r = p.rank;
-          const isMe = p.id === myPlayerId;
-          const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
-          // Height based on rank
-          const barHeight = r === 0 ? 250 : r === 1 ? 180 : 120;
-
-          return `
-                  <div class="battle-podium-item rank-${r} ${isMe ? 'is-me' : ''}">
-                    <div style="font-weight:700; text-transform:uppercase; margin-bottom:8px;">${Utils.escapeHtml(p.name)}</div>
-                    <div class="battle-podium-bar" style="height:${barHeight}px; width:80px; background:${r === 0 ? 'var(--primary)' : 'var(--text)'}; color:var(--bg); display:flex; align-items:flex-end; justify-content:center; padding-bottom:12px; font-weight:800; font-size:2rem;">
-                      ${medals[r]}
-                    </div>
-                    <div style="margin-top:12px; font-weight:700; color:var(--primary); font-size:1.2rem;">${p.correctCount} / ${totalQ}</div>
-                    <div class="mono" style="color:var(--text-muted); font-size:0.8rem;">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</div>
-                  </div>
-                `;
-        }).join('')}
-            </div>
-
-            ${sorted.length > 3 ? `
-              <div class="card" style="margin-top:40px;">
-                <div class="card-header">UNIT_PERFORMANCE</div>
-                <table class="leaderboard-table">
-                  <thead>
-                    <tr><th class="mono">RANK</th><th>OPERATOR</th><th style="text-align:right;">DATA</th><th style="text-align:right;">TIME</th></tr>
-                  </thead>
-                  <tbody>
-                    ${sorted.map((p, i) => {
-          const isMe = p.id === myPlayerId;
-          const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
-          return `
-                        <tr class="${isMe ? 'highlight-row' : ''}" style="${isMe ? 'background:var(--bg-secondary);' : ''}">
-                          <td class="rank-cell mono">${i + 1}</td>
-                          <td class="name-cell" style="font-weight:700;">${Utils.escapeHtml(p.name)}</td>
-                          <td class="score-cell">${p.correctCount}/${totalQ} (${score}%)</td>
-                          <td class="time-cell">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</td>
-                        </tr>
-                      `;
-        }).join('')}
-                  </tbody>
-                </table>
+              <div class="podium-bar pop-in" style="width:120px; display:flex; flex-direction:column; align-items:center;">
+                 <div class="avatar" style="margin-bottom:10px; background:#D89E00; color:white; width:90px; height:90px; font-size:2.5rem; border:4px solid white; box-shadow:0 0 20px rgba(255,215,0,0.5);">
+                    ${p1.name.charAt(0)}
+                 </div>
+                 <div style="background:#D89E00; width:100%; height:260px; border-radius:10px 10px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px; font-weight:900; font-size:3rem; color:white; box-shadow:0 4px 0 rgba(0,0,0,0.2);">1</div>
+                 <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:700; border-radius:0 0 5px 5px; font-size:1.1rem;">${Utils.escapeHtml(p1.name)}</div>
+                 <div style="color:white; font-weight:700; margin-top:5px; font-size:1.2rem;">${p1.correctCount} pts</div>
               </div>
-            ` : ''}
 
-            <div style="display:flex;gap:12px;margin-top:40px;flex-wrap:wrap;justify-content:center; padding-bottom: 60px;">
-              <a href="battle.html" class="btn btn-block" style="background:var(--primary); color:white;">NEW SESSION</a>
-              <a href="tests.html" class="btn btn-outline btn-block">RETURN TO BASE</a>
+              ${p3 ? `
+                <div class="podium-bar pop-in" style="animation-delay:0.4s; width:100px; display:flex; flex-direction:column; align-items:center;">
+                   <div class="avatar" style="margin-bottom:10px; background:#CD7F32; color:white; width:60px; height:60px; font-size:1.5rem; border:3px solid white;">${p3.name.charAt(0)}</div>
+                   <div style="background:#CD7F32; width:100%; height:130px; border-radius:10px 10px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px; font-weight:900; color:white; font-size:2rem; box-shadow:0 4px 0 rgba(0,0,0,0.2);">3</div>
+                   <div style="background:white; color:#333; width:100%; padding:8px 5px; font-weight:700; border-radius:0 0 5px 5px; font-size:0.9rem;">${Utils.escapeHtml(p3.name)}</div>
+                   <div style="color:white; font-weight:700; margin-top:5px;">${p3.correctCount} pts</div>
+                </div>
+              ` : ''}
             </div>
+
+            <a href="tests.html" class="btn btn-outline" style="color:white; border-color:white; padding:15px 40px; font-size:1.2rem;">Exit to Menu</a>
           </div>
         `;
-
-        // Clear battle state from localStorage
-        localStorage.removeItem('battle_player_id');
-        localStorage.removeItem('battle_room');
-        localStorage.removeItem('battle_is_creator');
       }
-
     })();
   </script>
 </body>
