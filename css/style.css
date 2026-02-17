@@ -263,7 +263,8 @@ label {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  text-align: left;
+  text-transform: none;
+  /* Preserve formula case (σ ≠ Σ) */
 }
 
 .answer-btn .shape-icon {
