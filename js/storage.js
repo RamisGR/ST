@@ -95,6 +95,11 @@ const Storage = (() => {
     localStorage.removeItem(KEYS.USER);
   }
 
+  function logout() {
+    clearUser();
+    window.location.href = 'index.html';
+  }
+
   // ——— Tests ———
   function getTests() {
     const raw = localStorage.getItem(KEYS.TESTS);
@@ -376,7 +381,7 @@ const Storage = (() => {
     onResultsChange,
     onTestsChange,
     onSessionsChange,
-    getUser, setUser, clearUser,
+    getUser, setUser, clearUser, logout,
     getTests, getTest, saveTest, deleteTest,
     getResults, getResultsForTest, saveResult, getUserResults,
     getSessions, saveSession, removeSession, clearSessions,
