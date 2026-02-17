@@ -1,34 +1,94 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin_Console // TestArena</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
-    rel="stylesheet">
+  <title>Game Master // TestArena</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .admin-header {
+      background: #333;
+      color: white;
+      padding: 15px 30px;
+      border-radius: var(--radius-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      background: white;
+      font-weight: 800;
+      color: #888;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .tab-btn.active {
+      background: var(--blue);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 0 var(--blue-shadow);
+    }
+
+    .editor-section {
+      background: white;
+      padding: 30px;
+      border-radius: var(--radius-md);
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .q-card {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: var(--radius-md);
+      margin-bottom: 20px;
+      border: 2px solid #eee;
+    }
+
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
 
-<body>
-  <div id="app" class="container"></div>
+<body class="center-content">
+  <div id="app" class="container" style="max-width:1000px;"></div>
 
   <!-- Modal for confirmation -->
   <div id="confirmModal" class="modal-overlay">
     <div class="modal">
-      <div class="card-header">
-        <span>CONFIRM ACTION</span>
-        <span style="color:var(--danger)">CAUTION</span>
+      <div class="card-header"
+        style="background:var(--red); color:white; padding:10px 20px; border-radius:10px 10px 0 0; font-weight:900;">
+        CONFIRM ACTION
       </div>
-      <h2 id="modalTitle" style="margin-bottom: var(--gap); font-size: 2rem;">Confirm?</h2>
-      <p id="modalText" class="mono" style="margin-bottom: var(--gap);"></p>
-      <div class="modal-actions" style="display:flex; gap:12px; justify-content: flex-end;">
-        <button id="modalCancel" class="btn btn-outline">CANCEL</button>
-        <button id="modalConfirm" class="btn"
-          style="background:var(--danger); color:white; border:none;">EXECUTE</button>
+      <div style="padding:20px;">
+        <h2 id="modalTitle" style="margin-bottom: 15px; font-size: 1.5rem; color:#333;">Confirm?</h2>
+        <p id="modalText" style="margin-bottom: 25px; color:#666; font-size:1.1rem;"></p>
+        <div class="modal-actions" style="display:flex; gap:12px; justify-content: flex-end;">
+          <button id="modalCancel" class="btn btn-outline" style="color:#555; border-color:#ccc;">Cancel</button>
+          <button id="modalConfirm" class="btn btn-danger">Yes, I'm sure</button>
+        </div>
       </div>
     </div>
   </div>
@@ -58,28 +118,28 @@
       function render() {
         // Custom Header for Admin
         const headerHtml = `
-          <header style="padding: 24px 0; border-bottom: 2px solid var(--text); margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; text-transform: uppercase;">
-              TestArena <span style="color: var(--primary)">//</span> ADMIN
+          <div class="admin-header">
+            <div style="font-weight: 900; font-size: 1.4rem; text-transform: uppercase; letter-spacing:1px;">
+              TEST ARENA <span style="opacity:0.5; margin:0 5px;">//</span> <span style="color:var(--yellow);">GAME MASTER</span>
             </div>
-            <div style="font-family: var(--font-mono); font-size: 0.9rem;">
-              OPERATOR: ${Utils.escapeHtml(user.name)}
-              <a href="#" onclick="Storage.logout()" style="margin-left: 12px; color: var(--danger); border-bottom: 1px solid currentColor;">LOGOUT</a>
+            <div style="font-weight: 700; font-size: 0.9rem; display:flex; align-items:center; gap:15px;">
+              <span>${Utils.escapeHtml(user.name)}</span>
+              <button onclick="Storage.logout()" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.3); padding:5px 15px; font-size:0.8rem;">LOGOUT</button>
             </div>
-          </header>
+          </div>
         `;
 
         document.getElementById('app').innerHTML = `
           ${headerHtml}
           <div class="fade-in">
-            <div class="tabs">
-              <button class="tab ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">TEST_MODULES</button>
-              <button class="tab ${currentTab === 'editor' ? 'active' : ''}" onclick="switchTab('editor')">
-                ${editingTest ? 'EDIT_MODE' : 'CREATE_NEW'}
+            <nav class="tab-nav">
+              <button class="tab-btn ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">Challenges</button>
+              <button class="tab-btn ${currentTab === 'editor' ? 'active' : ''}" onclick="switchTab('editor')">
+                ${editingTest ? 'Edit Challenge' : 'Create New'}
               </button>
-              <button class="tab ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">DATA_LOGS</button>
-              <button class="tab ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">SYSTEM</button>
-            </div>
+              <button class="tab-btn ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">Results</button>
+              <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">Settings</button>
+            </nav>
 
             <div id="tabContent"></div>
           </div>
@@ -106,31 +166,30 @@
         const tests = Storage.getTests();
         document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-            <p class="mono" style="color:var(--text-muted);">TOTAL_MODULES: <span style="color:var(--text); font-weight:700;">${tests.length}</span></p>
-            <button onclick="createNewTest()" class="btn">+ INITIALIZE TEST</button>
+            <p style="color:#666; font-weight:700;">Total Challenges: ${tests.length}</p>
+            <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">+ New Challenge</button>
           </div>
           ${tests.length === 0 ? `
-            <div class="empty-state">
-              <div class="empty-state-icon">!</div>
-              <p>NO MODULES FOUND. INITIALIZE NEW SEQUENCE.</p>
+            <div class="empty-state card" style="text-align:center; padding:50px;">
+              <div style="font-size:4rem; margin-bottom:10px;">📭</div>
+              <p style="font-size:1.5rem; font-weight:700; color:#555;">No challenges found.</p>
+              <p style="color:#888;">Create your first challenge to get started!</p>
             </div>
           ` : `
-            <div class="test-grid" style="border-top: none; padding-top: 0;">
+            <div style="display:grid; gap:20px;">
               ${tests.map(test => {
           const results = Storage.getResultsForTest(test.id);
           return `
-                  <div class="test-card">
+                  <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; padding:20px;">
                     <div>
-                      <div class="test-card-title" style="font-size: 1.5rem;">${Utils.escapeHtml(test.title)}</div>
-                      <div class="test-card-meta" style="flex-direction: column; gap: 4px; border-top:none; margin: 12px 0;">
-                        <span>Q_COUNT: ${test.questions.length}</span>
-                        <span>T_LIMIT: ${Utils.formatTime(test.timeLimit)}</span>
-                        <span>ATTEMPTS: ${results.length}</span>
+                      <h3 style="margin:0 0 5px 0; font-size:1.3rem; color:#333;">${Utils.escapeHtml(test.title)}</h3>
+                      <div style="font-size:0.9rem; color:#888; font-weight:600;">
+                        ${test.questions.length} Questions • ${Utils.formatTime(test.timeLimit)} • ${results.length} Attempts
                       </div>
                     </div>
-                    <div class="test-card-actions" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px;">EDIT</button>
-                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-outline" style="padding: 8px; color: var(--danger); border-color: var(--danger);">DELETE</button>
+                    <div style="display:flex; gap:10px;">
+                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">Edit</button>
+                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">Delete</button>
                     </div>
                   </div>
                 `;
@@ -153,9 +212,9 @@
       };
 
       window.confirmDeleteTest = function (id, title) {
-        showConfirmModal(`DELETE MODULE "${title}"?`, 'IRREVERSIBLE DATA LOSS. CONFIRM DELETION.', () => {
+        showConfirmModal(`Delete "${title}"?`, 'This cannot be undone. All results for this challenge will also be lost.', () => {
           Storage.deleteTest(id);
-          Utils.showNotification('MODULE DELETED', 'success');
+          Utils.showNotification('Challenge deleted!', 'success');
           render();
         });
       };
@@ -185,38 +244,35 @@
         if (!editingTest) return;
         const t = editingTest;
         document.getElementById('tabContent').innerHTML = `
-          <div class="card">
-            <div class="card-header">
-              <span>MODULE CONFIGURATION</span>
-              <span>ID: ${t.id.substring(0, 8)}</span>
+          <div class="editor-section">
+            <h2 style="margin-bottom:20px; color:#333;">Challenge Settings</h2>
+            <div class="form-group">
+              <label>Title</label>
+              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="e.g. History Trivia" style="font-weight:700;">
             </div>
             <div class="form-group">
-              <label>Designation (Title)</label>
-              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="e.g. JS_BASICS_V1">
+              <label>Description</label>
+              <textarea id="testDesc" class="form-control" rows="2" placeholder="Brief instruction...">${Utils.escapeHtml(t.description || '')}</textarea>
             </div>
             <div class="form-group">
-              <label>Briefing (Description)</label>
-              <textarea id="testDesc" class="form-control" rows="2" style="font-size: 1rem; font-family: var(--font-body);">${Utils.escapeHtml(t.description || '')}</textarea>
+              <label>Time Limit (Seconds)</label>
+              <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:150px;">
             </div>
-            <div class="form-group">
-              <label>Time Constraint (Seconds)</label>
-              <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:200px;">
+          
+
+            <h2 style="margin:40px 0 20px; color:#333; display:flex; justify-content:space-between; align-items:center;">
+              <span>Questions (${t.questions.length})</span>
+              <button onclick="addQuestion()" class="btn btn-success" style="padding:8px 15px; font-size:0.9rem;">+ Add Question</button>
+            </h2>
+
+            <div id="questionsList">
+              ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
             </div>
-          </div>
 
-          <h3 style="margin-bottom:24px; border-bottom: 2px solid var(--text); padding-bottom: 12px;">Data Points (${t.questions.length})</h3>
-
-          <div id="questionsList">
-            ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
-          </div>
-
-          <button onclick="addQuestion()" class="btn btn-outline btn-block" style="margin:24px 0;">
-            + APPEND DATA POINT
-          </button>
-
-          <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-top:40px; padding-top: 20px; border-top: 2px solid var(--text);">
-            <button onclick="saveTest()" class="btn" style="background: var(--primary); color: white;">SAVE MODULE</button>
-            <button onclick="switchTab('tests')" class="btn btn-outline">DISCARD</button>
+            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:40px; padding-top: 20px; border-top: 2px solid #eee;">
+               <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">Discard</button>
+               <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">Save Challenge</button>
+            </div>
           </div>
         `;
 
@@ -227,25 +283,24 @@
 
       function renderQuestionEditor(q, qi) {
         return `
-          <div class="card" data-qi="${qi}" style="box-shadow: none; border-color: #E5E5E5;">
-            <div class="card-header" style="border-bottom: 1px solid #E5E5E5; margin-bottom: 12px; padding-bottom: 8px;">
-              <span>POINT_${qi + 1}</span>
+          <div class="q-card" data-qi="${qi}">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+              <span style="font-weight:800; color:#888;">Question ${qi + 1}</span>
               ${editingTest.questions.length > 1 ? `
-                <button class="remove-question-btn" onclick="removeQuestion(${qi})" style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:700;">REMOVE</button>
+                <button onclick="removeQuestion(${qi})" style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:700;">Remove</button>
               ` : ''}
             </div>
             <div class="form-group">
               <input type="text" class="form-control q-text" data-qi="${qi}"
-                     value="${Utils.escapeHtml(q.text)}" placeholder="Query Text..." style="font-size: 1.2rem;">
+                     value="${Utils.escapeHtml(q.text)}" placeholder="Enter question text here..." style="font-weight:600;">
             </div>
             <div class="options-editor">
               ${q.options.map((opt, oi) => `
-                <div class="option-editor-row" style="margin-bottom: 8px;">
+                <div class="option-row">
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
-                         onchange="setCorrect(${qi}, ${oi})" style="width: 24px; height: 24px; accent-color: var(--primary);">
+                         onchange="setCorrect(${qi}, ${oi})" style="width: 20px; height: 20px; accent-color: var(--green); cursor:pointer;">
                   <input type="text" class="form-control q-option" data-qi="${qi}" data-oi="${oi}"
-                         value="${Utils.escapeHtml(opt)}" placeholder="Option ${String.fromCharCode(65 + oi)}" style="font-size: 1rem; padding: 12px;">
-                  <span class="correct-label mono" style="width: 30px; text-align: center;">${q.correct === oi ? 'TRUE' : ''}</span>
+                         value="${Utils.escapeHtml(opt)}" placeholder="Option ${String.fromCharCode(65 + oi)}" style="border:1px solid ${q.correct === oi ? 'var(--green)' : '#ddd'};">
                 </div>
               `).join('')}
             </div>
@@ -276,8 +331,10 @@
       window.addQuestion = function () {
         editingTest.questions.push(createEmptyQuestion());
         renderEditor();
-        const list = document.getElementById('questionsList');
-        if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+        setTimeout(() => {
+          const list = document.getElementById('questionsList');
+          if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       };
       window.removeQuestion = function (qi) {
         editingTest.questions.splice(qi, 1);
@@ -285,11 +342,11 @@
       };
       window.saveTest = function () {
         const t = editingTest;
-        if (!t.title.trim()) { Utils.showNotification('TITLE_REQUIRED', 'error'); return; }
-        if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('MISSING_QUERY_TEXT', 'error'); return; }
-        if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('INCOMPLETE_OPTIONS', 'error'); return; }
+        if (!t.title.trim()) { Utils.showNotification('Title is required!', 'error'); return; }
+        if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('Some questions are empty!', 'error'); return; }
+        if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('Some options are empty!', 'error'); return; }
         Storage.saveTest(t);
-        Utils.showNotification('MODULE_SAVED', 'success');
+        Utils.showNotification('Challenge Saved Successfully!', 'success');
         editingTest = null;
         currentTab = 'tests';
         render();
@@ -302,9 +359,9 @@
 
         document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-            <p class="mono">TOTAL_RECORDS: ${allResults.length}</p>
+            <p style="color:#666; font-weight:700;">Total Records: ${allResults.length}</p>
             ${allResults.length > 0 ? `
-              <button onclick="confirmClearResults()" class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);">PURGE ALL DATA</button>
+              <button onclick="confirmClearResults()" class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);">Clear All History</button>
             ` : ''}
           </div>
 
@@ -312,45 +369,45 @@
           const results = Storage.getResultsForTest(test.id);
           if (results.length === 0) return '';
           return `
-              <div class="card" style="margin-bottom:24px;">
-                <div class="card-header">
+              <div class="card" style="margin-bottom:30px; padding:0; overflow:hidden;">
+                <div class="card-header" style="background:#f9f9f9; padding:15px 20px; font-weight:800; color:#444; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
                   <span>${Utils.escapeHtml(test.title)}</span>
-                  <span>COUNT: ${results.length}</span>
+                  <span style="background:var(--blue); color:white; padding:2px 8px; border-radius:10px; font-size:0.8rem;">${results.length}</span>
                 </div>
-                <table class="leaderboard-table">
+                <table class="leaderboard-table" style="width:100%; border-collapse:collapse;">
                   <thead>
-                    <tr>
-                      <th style="text-align:center;">RANK</th>
-                      <th>IDENTIFIER</th>
-                      <th>UNIT</th>
-                      <th style="text-align:right;">RATING</th>
-                      <th style="text-align:right;">TIME</th>
-                      <th style="text-align:right;">TIMESTAMP</th>
+                    <tr style="background:white; border-bottom:2px solid #eee; text-align:left; color:#888; font-size:0.9rem;">
+                      <th style="padding:12px 20px;">Rank</th>
+                      <th style="padding:12px;">Player</th>
+                      <th style="padding:12px;">Group</th>
+                      <th style="padding:12px; text-align:right;">Score</th>
+                      <th style="padding:12px; text-align:right;">Time</th>
+                      <th style="padding:12px; text-align:right;">Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${results.map((r, i) => `
-                      <tr>
-                        <td class="rank-cell rank-${i + 1}">${i + 1}</td>
-                        <td class="name-cell">${Utils.escapeHtml(r.userName)}</td>
-                        <td class="mono" style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
-                        <td class="score-cell">${r.score}%</td>
-                        <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
-                        <td class="mono" style="color:var(--text-muted); text-align:right; font-size:0.85rem;">${new Date(r.completedAt).toLocaleDateString()}</td>
+                      <tr style="border-bottom:1px solid #f9f9f9;">
+                        <td style="padding:12px 20px;"><strong>${i + 1}</strong></td>
+                        <td style="padding:12px; color:#333; font-weight:700;">${Utils.escapeHtml(r.userName)}</td>
+                        <td style="padding:12px; color:#888;">${Utils.escapeHtml(r.userGroup || '-')}</td>
+                        <td style="padding:12px; text-align:right; color:var(--blue); font-weight:800;">${r.score}%</td>
+                        <td style="padding:12px; text-align:right; font-family:monospace;">${Utils.formatTime(r.timeSpent)}</td>
+                        <td style="padding:12px; text-align:right; color:#999; font-size:0.85rem;">${new Date(r.completedAt).toLocaleDateString()}</td>
                       </tr>
                     `).join('')}
                   </tbody>
                 </table>
               </div>
             `;
-        }).join('') || '<div class="empty-state"><div class="empty-state-icon">!</div><p>NO DATA RECORDS</p></div>'}
+        }).join('') || '<div class="empty-state card" style="text-align:center; padding:40px;"><p>No results recorded yet.</p></div>'}
         `;
       }
 
       window.confirmClearResults = function () {
-        showConfirmModal('PURGE ALL DATA?', 'IRREVERSIBLE. CONFIRM.', () => {
+        showConfirmModal('Clear All History?', 'This will permanently delete all student results. Challenges will remain.', () => {
           Storage.clearAllResults();
-          Utils.showNotification('DATABASE PURGED', 'success');
+          Utils.showNotification('History cleared!', 'success');
           render();
         });
       };
@@ -359,17 +416,18 @@
       function renderSettings() {
         const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
         document.getElementById('tabContent').innerHTML = `
-          <div class="card" style="max-width:500px;">
-            <div class="card-header">SYSTEM CONFIG</div>
+          <div class="card" style="max-width:500px; margin:0 auto; padding:30px;">
+            <h2 style="margin-bottom:25px; color:#333;">System Configuration</h2>
             <div class="form-group">
-              <label>Administrator Key</label>
+              <label>Admin Password</label>
               <input type="text" id="adminPass" class="form-control" value="${Utils.escapeHtml(currentPassword)}">
             </div>
-            <button onclick="saveSettings()" class="btn btn-block">SAVE CONFIG</button>
+            <button onclick="saveSettings()" class="btn btn-primary btn-block" style="margin-top:20px;">Save Configuration</button>
 
-            <div style="margin-top:40px; padding-top:20px; border-top:2px solid var(--danger);">
-              <h3 style="margin-bottom:12px; color:var(--danger); font-family:var(--font-mono);">DANGER ZONE</h3>
-              <button onclick="confirmResetAll()" class="btn btn-block" style="background:var(--danger); color:white;">FACTORY RESET</button>
+            <div style="margin-top:50px; padding-top:25px; border-top:2px solid #eee;">
+              <h3 style="margin-bottom:15px; color:var(--danger);">Danger Zone</h3>
+              <p style="color:#666; margin-bottom:15px; font-size:0.9rem;">Resetting the system will delete ALL challenges and ALL results. This provides a fresh start.</p>
+              <button onclick="confirmResetAll()" class="btn btn-block btn-outline" style="color:var(--danger); border-color:var(--danger);">Factory Reset</button>
             </div>
           </div>
         `;
@@ -377,15 +435,15 @@
 
       window.saveSettings = function () {
         const pass = document.getElementById('adminPass').value.trim();
-        if (!pass) { Utils.showNotification('KEY_REQUIRED', 'error'); return; }
+        if (!pass) { Utils.showNotification('Password required!', 'error'); return; }
         localStorage.setItem('ct_admin_password', pass);
-        Utils.showNotification('CONFIG SAVED', 'success');
+        Utils.showNotification('Settings saved!', 'success');
       };
 
       window.confirmResetAll = function () {
-        showConfirmModal('FACTORY RESET?', 'COMPLETE SYSTEM WIPE. CONFIRM.', () => {
+        showConfirmModal('Factory Reset?', 'WARNING: This will delete ALL challenges and results. Are you sure?', () => {
           Storage.resetAllData();
-          Utils.showNotification('SYSTEM RESET', 'success');
+          Utils.showNotification('System reset successfully', 'success');
           render();
         });
       };
@@ -395,15 +453,22 @@
         document.getElementById('modalTitle').textContent = title;
         document.getElementById('modalText').textContent = text;
         modal.classList.add('active');
+
         const confirmBtn = document.getElementById('modalConfirm');
         const cancelBtn = document.getElementById('modalCancel');
+
+        // Clone to remove old listeners
+        const newConfirm = confirmBtn.cloneNode(true);
+        const newCancel = cancelBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
         const cleanup = () => {
           modal.classList.remove('active');
-          confirmBtn.replaceWith(confirmBtn.cloneNode(true));
-          cancelBtn.replaceWith(cancelBtn.cloneNode(true));
         };
-        document.getElementById('modalConfirm').addEventListener('click', () => { cleanup(); onConfirm(); });
-        document.getElementById('modalCancel').addEventListener('click', cleanup);
+
+        newConfirm.addEventListener('click', () => { cleanup(); onConfirm(); });
+        newCancel.addEventListener('click', cleanup);
         modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
       }
     })();

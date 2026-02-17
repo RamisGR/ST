@@ -1,40 +1,118 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TestArena - Game Lobby</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .hero-title {
+      font-size: clamp(3.5rem, 10vw, 6rem);
+      transform: rotate(-3deg);
+      text-shadow: 6px 6px 0 var(--blue-shadow);
+      margin-bottom: 40px;
+      line-height: 0.9;
+      color: white;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .login-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      width: 100%;
+      position: relative;
+    }
+
+    .login-card {
+      max-width: 400px;
+      width: 90%;
+      margin: 0 auto;
+      transform: rotate(2deg);
+      border-top: 12px solid var(--purple);
+      transition: transform 0.3s;
+      background: white;
+      border-radius: 20px;
+      padding: 40px 30px;
+      box-shadow: 0 10px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    .login-card:hover {
+      transform: rotate(0deg) scale(1.02);
+    }
+
+    .floating-shape {
+      position: absolute;
+      opacity: 0.4;
+      z-index: -1;
+      animation: float 8s infinite ease-in-out;
+    }
+
+    @keyframes float {
+
+      0%,
+      100% {
+        transform: translateY(0) rotate(0deg);
+      }
+
+      50% {
+        transform: translateY(-20px) rotate(10deg);
+      }
+    }
+  </style>
 </head>
 
-<body class="center-content">
-  <div id="app" class="container">
-    <div class="hero fade-in">
-      <h1>TestArena</h1>
-      <div class="card" style="max-width: 400px; margin: 0 auto; transform: rotate(-1deg);">
-        <div style="text-align:center; color: #888; font-weight: 700; margin-bottom: 20px; text-transform:uppercase;">
-          Enter Nickname
+<body style="overflow:hidden; background: var(--bg-app);">
+  <!-- Decorative Background Shapes -->
+  <div class="floating-shape"
+    style="top:10%; left:5%; width:100px; height:100px; background:var(--yellow); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); animation-delay:0s;">
+  </div>
+  <div class="floating-shape"
+    style="bottom:20%; right:10%; width:150px; height:150px; background:var(--red); border-radius:50%; animation-delay:2s;">
+  </div>
+  <div class="floating-shape"
+    style="top:20%; right:20%; width:80px; height:80px; background:var(--blue); transform:rotate(45deg); animation-delay:4s; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);">
+  </div>
+  <div class="floating-shape"
+    style="bottom:10%; left:20%; width:60px; height:60px; background:var(--green); animation-delay:1s;"></div>
+
+  <div id="app" class="container login-container">
+    <div class="fade-in" style="width:100%; text-align:center;">
+      <h1 class="hero-title">TEST<br>ARENA</h1>
+
+      <div class="login-card">
+        <div
+          style="text-align:center; color: #888; font-weight: 800; margin-bottom: 25px; text-transform:uppercase; letter-spacing:2px; font-size:0.9rem;">
+          Player Login
         </div>
 
         <form id="loginForm">
-          <div class="form-group">
-            <input type="text" id="username" class="form-control" placeholder="Nickname" required maxlength="15"
-              autocomplete="off" style="font-size: 1.5rem; text-align:center;">
+          <div class="form-group" style="margin-bottom:20px;">
+            <input type="text" id="username" class="form-control" placeholder="YOUR NICKNAME" required maxlength="15"
+              autocomplete="off"
+              style="font-size: 1.3rem; text-align:center; text-transform:uppercase; font-weight:900; padding:15px; border-width:3px;">
           </div>
-          <div class="form-group">
-            <input type="text" id="group" class="form-control" placeholder="Group (Optional)" maxlength="10"
-              autocomplete="off" style="text-align:center;">
+          <div class="form-group" style="margin-bottom:30px;">
+            <input type="text" id="group" class="form-control" placeholder="GROUP (OPTIONAL)" maxlength="10"
+              autocomplete="off"
+              style="text-align:center; text-transform:uppercase; font-weight:700; padding:15px; border-width:3px;">
           </div>
-          <button type="submit" class="btn btn-block btn-primary" style="font-size: 1.2rem; padding: 20px;">Enter
-            Lobby</button>
+          <button type="submit" class="btn btn-block"
+            style="font-size: 1.4rem; padding: 18px; background:var(--purple); color:white; border:none; border-bottom:5px solid #321066; box-shadow:none;">
+            ENTER LOBBY
+          </button>
         </form>
       </div>
 
-      <div style="margin-top: 30px; text-align: center;">
-        <a href="admin.html"
-          style="color: rgba(255,255,255,0.5); font-weight: 700; font-size: 0.9rem; text-decoration: none; border: none;">Teacher
-          Login &rarr;</a>
+      <div style="margin-top: 40px;">
+        <a href="admin.html" class="btn"
+          style="color: rgba(255,255,255,0.7); background:rgba(0,0,0,0.2); border:none; font-weight: 700; font-size: 0.9rem; padding:10px 25px; border-radius:30px; transition:all 0.2s;">
+          Teacher Console
+        </a>
       </div>
     </div>
   </div>
@@ -57,6 +135,14 @@
         Storage.setUser({ name, group, role: 'student' });
         window.location.href = 'tests.html';
       }
+    });
+
+    // Make button bounce on hover
+    document.querySelector('button[type="submit"]').addEventListener('mouseover', function () {
+      this.style.transform = 'translateY(-2px)';
+    });
+    document.querySelector('button[type="submit"]').addEventListener('mouseout', function () {
+      this.style.transform = 'translateY(0)';
     });
   </script>
 </body>
