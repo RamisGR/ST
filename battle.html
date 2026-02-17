@@ -1,13 +1,35 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battle — TestArena</title>
+  <title>Battle_Mode // TestArena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .battle-glow {
+      animation: textGlow 2s infinite alternate;
+    }
+
+    @keyframes textGlow {
+      from {
+        text-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+      }
+
+      to {
+        text-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <div id="app"></div>
+  <div id="app" class="container"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -19,7 +41,7 @@
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
-    (function() {
+    (function () {
       const user = Storage.getUser();
       const roomParam = Utils.getQueryParam('room');
 
@@ -41,11 +63,10 @@
       if (!Storage.isOnline()) {
         document.getElementById('app').innerHTML = `
           <div class="hero fade-in">
-            <h1>TestArena Battle</h1>
+            <h1 class="battle-glow">OFFLINE_MODE_DETECTED</h1>
             <div class="card" style="max-width:500px;margin:0 auto;text-align:center;">
-              <p style="color:var(--danger);font-size:1.1rem;">Соревновательный режим требует подключения к Firebase.</p>
-              <p style="color:var(--text-muted);margin-top:12px;">Убедитесь, что Firebase настроен и есть интернет-соединение.</p>
-              <a href="tests.html" class="btn btn-primary" style="margin-top:20px;">Назад к тестам</a>
+              <p style="color:var(--danger);font-family:var(--font-mono);">NETWORK CONNECTION REQUIRED FOR BATTLE MODE.</p>
+              <a href="tests.html" class="btn" style="margin-top:20px;">RETURN TO BASE</a>
             </div>
           </div>
         `;
@@ -65,57 +86,59 @@
         const tests = Storage.getTests();
         document.getElementById('app').innerHTML = `
           ${user ? Utils.renderHeader(user, 'battle') : ''}
-          <div class="container fade-in" style="max-width:600px;">
-            <div style="text-align:center;margin:30px 0 20px;">
-              <h1 class="battle-title-glow">Battle Mode</h1>
-              <p style="color:var(--text-muted);">Соревнуйтесь с друзьями в реальном времени!</p>
+          <div class="container fade-in" style="max-width:800px;">
+            <div style="text-align:center;margin:30px 0 40px;">
+              <h1 class="battle-glow" style="font-size:3rem; margin-bottom: 8px;">BATTLE_MODE</h1>
+              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">Real-time competitive assessment protocol</p>
             </div>
 
-            <div class="card" style="margin-bottom:20px;">
-              <div class="card-header">Создать комнату</div>
-              ${!user ? `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <div class="card" style="margin-bottom:0;">
+                <div class="card-header">INITIATE_SESSION</div>
+                ${!user ? `
+                  <div class="form-group">
+                    <label for="creatorName">OPERATOR_NAME</label>
+                    <input type="text" id="creatorName" class="form-control" placeholder="ENTER IDENTIFIER" -required maxlength="50">
+                  </div>
+                  <div class="form-group">
+                    <label for="creatorGroup">UNIT (OPTIONAL)</label>
+                    <input type="text" id="creatorGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
+                  </div>
+                ` : ''}
                 <div class="form-group">
-                  <label for="creatorName">Ваше имя</label>
-                  <input type="text" id="creatorName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                  <label for="testSelect">SELECT_MODULE</label>
+                  <select id="testSelect" class="form-control" style="font-family:var(--font-mono);">
+                    ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)} [${t.questions.length} PTS]</option>`).join('')}
+                  </select>
                 </div>
-                <div class="form-group">
-                  <label for="creatorGroup">Группа (необязательно)</label>
-                  <input type="text" id="creatorGroup" class="form-control" placeholder="10-А" maxlength="30">
-                </div>
-              ` : ''}
-              <div class="form-group">
-                <label for="testSelect">Выберите тест</label>
-                <select id="testSelect" class="form-control">
-                  ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)} (${t.questions.length} вопр.)</option>`).join('')}
-                </select>
+                <button id="createBtn" class="btn btn-block" style="background:var(--primary); color:white; margin-top:24px;">CREATE ROOM</button>
               </div>
-              <button id="createBtn" class="btn btn-accent btn-block btn-lg">Создать комнату</button>
-            </div>
 
-            <div class="card">
-              <div class="card-header">Присоединиться</div>
-              ${!user ? `
+              <div class="card" style="margin-bottom:0;">
+                <div class="card-header">JOIN_SESSION</div>
+                ${!user ? `
+                  <div class="form-group">
+                    <label for="joinName">OPERATOR_NAME</label>
+                    <input type="text" id="joinName" class="form-control" placeholder="ENTER IDENTIFIER" required maxlength="50">
+                  </div>
+                  <div class="form-group">
+                    <label for="joinGroup">UNIT (OPTIONAL)</label>
+                    <input type="text" id="joinGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
+                  </div>
+                ` : ''}
                 <div class="form-group">
-                  <label for="joinName">Ваше имя</label>
-                  <input type="text" id="joinName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                  <label for="roomCode">ACCESS_CODE</label>
+                  <input type="text" id="roomCode" class="form-control" placeholder="X-X-X-X" maxlength="6" style="text-transform:uppercase;font-size:1.5rem;text-align:center;letter-spacing:6px;font-weight:700; font-family:var(--font-mono);">
                 </div>
-                <div class="form-group">
-                  <label for="joinGroup">Группа (необязательно)</label>
-                  <input type="text" id="joinGroup" class="form-control" placeholder="10-А" maxlength="30">
-                </div>
-              ` : ''}
-              <div class="form-group">
-                <label for="roomCode">Код комнаты</label>
-                <input type="text" id="roomCode" class="form-control" placeholder="ABCDEF" maxlength="6" style="text-transform:uppercase;font-size:1.3rem;text-align:center;letter-spacing:4px;font-weight:700;">
+                <button id="joinBtn" class="btn btn-outline btn-block" style="margin-top:24px;">CONNECT</button>
               </div>
-              <button id="joinBtn" class="btn btn-primary btn-block btn-lg">Присоединиться</button>
             </div>
           </div>
         `;
 
-        document.getElementById('createBtn').addEventListener('click', function() {
+        document.getElementById('createBtn').addEventListener('click', function () {
           this.disabled = true;
-          this.textContent = 'Создание...';
+          this.textContent = 'INITIALIZING...';
           let name, group;
           if (user) {
             name = user.name;
@@ -123,12 +146,12 @@
           } else {
             name = document.getElementById('creatorName').value.trim();
             group = document.getElementById('creatorGroup') ? document.getElementById('creatorGroup').value.trim() : '';
-            if (!name) { Utils.showNotification('Введите имя!', 'error'); this.disabled = false; this.textContent = 'Создать комнату'; return; }
+            if (!name) { alert('NAME REQUIRED'); this.disabled = false; this.textContent = 'CREATE ROOM'; return; }
             Storage.setUser({ name, group, role: 'student' });
           }
           const testId = document.getElementById('testSelect').value;
           const test = Storage.getTest(testId);
-          if (!test) { Utils.showNotification('Тест не найден!', 'error'); this.disabled = false; this.textContent = 'Создать комнату'; return; }
+          if (!test) { alert('MODULE NOT FOUND'); this.disabled = false; this.textContent = 'CREATE ROOM'; return; }
 
           const b = Storage.createBattle(testId, test.title, test.questions.length, test.timeLimit, name);
           myPlayerId = Storage.joinBattle(b.id, name, group);
@@ -142,11 +165,11 @@
           showLobby(b.id);
         });
 
-        document.getElementById('joinBtn').addEventListener('click', function() {
+        document.getElementById('joinBtn').addEventListener('click', function () {
           const code = document.getElementById('roomCode').value.trim().toUpperCase();
-          if (!code || code.length < 4) { Utils.showNotification('Введите код комнаты!', 'error'); return; }
+          if (!code || code.length < 4) { alert('INVALID CODE'); return; }
           this.disabled = true;
-          this.textContent = 'Подключение...';
+          this.textContent = 'CONNECTING...';
           showJoinScreen(code);
         });
       }
@@ -170,28 +193,28 @@
           // Show name input
           document.getElementById('app').innerHTML = `
             <div class="hero fade-in">
-              <h1 class="battle-title-glow">Battle Mode</h1>
-              <p style="color:var(--text-muted);">Комната: <strong style="color:var(--accent);font-size:1.3rem;letter-spacing:3px;">${Utils.escapeHtml(roomCode)}</strong></p>
+              <h1 class="battle-glow">AUTHENTICATION</h1>
+              <p class="mono" style="color:var(--text-muted);">TARGET_SESSION: <strong style="color:var(--primary);">${Utils.escapeHtml(roomCode)}</strong></p>
               <div class="card" style="max-width:420px;margin:20px auto 0;">
-                <div class="card-header">Представьтесь</div>
+                <div class="card-header">OPERATOR_DETAILS</div>
                 <div class="form-group">
-                  <label for="playerName">Ваше имя</label>
-                  <input type="text" id="playerName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                  <label for="playerName">OPERATOR_NAME</label>
+                  <input type="text" id="playerName" class="form-control" placeholder="ENTER IDENTIFIER" required maxlength="50">
                 </div>
                 <div class="form-group">
-                  <label for="playerGroup">Группа (необязательно)</label>
-                  <input type="text" id="playerGroup" class="form-control" placeholder="10-А" maxlength="30">
+                  <label for="playerGroup">UNIT (OPTIONAL)</label>
+                  <input type="text" id="playerGroup" class="form-control" placeholder="UNIT-01" maxlength="30">
                 </div>
-                <button id="enterBtn" class="btn btn-primary btn-block btn-lg">Войти в комнату</button>
+                <button id="enterBtn" class="btn btn-primary btn-block">JOIN SESSION</button>
               </div>
             </div>
           `;
-          document.getElementById('enterBtn').addEventListener('click', function() {
+          document.getElementById('enterBtn').addEventListener('click', function () {
             const n = document.getElementById('playerName').value.trim();
             const g = document.getElementById('playerGroup').value.trim();
-            if (!n) { Utils.showNotification('Введите имя!', 'error'); return; }
+            if (!n) { alert('NAME REQUIRED'); return; }
             this.disabled = true;
-            this.textContent = 'Подключение...';
+            this.textContent = 'CONNECTING...';
             Storage.setUser({ name: n, group: g, role: 'student' });
             doJoin(roomCode, n, g);
           });
@@ -214,10 +237,10 @@
             joinLock = false;
             document.getElementById('app').innerHTML = `
               <div class="hero fade-in">
-                <h1 class="battle-title-glow">Battle Mode</h1>
+                <h1>SESSION_NOT_FOUND</h1>
                 <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
-                  <p style="color:var(--danger);font-size:1.1rem;">Комната <strong>${Utils.escapeHtml(roomCode)}</strong> не найдена.</p>
-                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Назад</a>
+                  <p class="mono" style="color:var(--danger);">SESSION ${Utils.escapeHtml(roomCode)} INVALID OR EXPIRED.</p>
+                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">RETURN</a>
                 </div>
               </div>
             `;
@@ -228,10 +251,10 @@
             joinLock = false;
             document.getElementById('app').innerHTML = `
               <div class="hero fade-in">
-                <h1 class="battle-title-glow">Battle Mode</h1>
+                <h1>SESSION_LOCKED</h1>
                 <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
-                  <p style="color:var(--warning);font-size:1.1rem;">Эта игра уже началась или завершена.</p>
-                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Создать новую комнату</a>
+                  <p class="mono" style="color:var(--warning);">SESSION IN PROGRESS OR COMPLETED.</p>
+                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">NEW SESSION</a>
                 </div>
               </div>
             `;
@@ -290,53 +313,53 @@
           ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
           <div class="container fade-in" style="max-width:600px;">
             <div style="text-align:center;margin:20px 0;">
-              <h2 class="battle-title-glow">Ожидание игроков</h2>
-              <p style="color:var(--text-muted);">Тест: <strong>${Utils.escapeHtml(data.testTitle)}</strong></p>
+              <h2 class="battle-glow" style="margin-bottom:8px;">WAITING FOR DEPLOYMENT</h2>
+              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">MODULE: <strong>${Utils.escapeHtml(data.testTitle)}</strong></p>
             </div>
 
-            <div class="card battle-room-card" style="text-align:center;margin-bottom:20px;">
-              <div style="margin-bottom:16px;">
-                <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:4px;">Код комнаты</div>
-                <div class="room-code-display">${roomCode}</div>
+            <div class="card battle-room-card" style="text-align:center;margin-bottom:20px; border:2px dashed var(--text-muted);">
+              <div style="margin-bottom:24px;">
+                <div class="mono" style="color:var(--text-muted);font-size:0.8rem;margin-bottom:8px;">SESSION_CODE</div>
+                <div class="room-code-display" style="font-family:var(--font-mono); font-size:3rem; letter-spacing:8px; font-weight:700; color:var(--primary); line-height:1;">${roomCode}</div>
               </div>
-              <div style="margin-bottom:16px;">
-                <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:4px;">Ссылка для друзей</div>
+              <div style="margin-bottom:8px;">
+                <div class="mono" style="color:var(--text-muted);font-size:0.8rem;margin-bottom:4px;">SECURE_LINK</div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <input type="text" value="${shareUrl}" class="form-control" style="font-size:0.8rem;text-align:center;" readonly id="shareUrl">
-                  <button onclick="copyLink()" class="btn btn-sm btn-outline" id="copyBtn">Копировать</button>
+                  <input type="text" value="${shareUrl}" class="form-control" style="font-size:0.8rem;text-align:center; font-family:var(--font-mono);" readonly id="shareUrl">
+                  <button onclick="copyLink()" class="btn btn-sm btn-outline" id="copyBtn">COPY</button>
                 </div>
               </div>
             </div>
 
             <div class="card" style="margin-bottom:20px;">
-              <div class="card-header">Игроки (${players.length})</div>
+              <div class="card-header">OPERATORS_DETECTED [${players.length}]</div>
               <div class="battle-players-list">
                 ${players.map((p, i) => `
-                  <div class="battle-player-item">
-                    <div class="battle-player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                  <div class="battle-player-item" style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--border);">
+                    <div class="battle-player-avatar" style="width:32px; height:32px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; font-weight:700; font-family:var(--font-mono);">${p.name.charAt(0).toUpperCase()}</div>
                     <div>
-                      <div style="font-weight:600;">${Utils.escapeHtml(p.name)}</div>
-                      ${p.group ? `<div style="color:var(--text-muted);font-size:0.8rem;">${Utils.escapeHtml(p.group)}</div>` : ''}
+                      <div style="font-weight:700;">${Utils.escapeHtml(p.name)}</div>
+                      ${p.group ? `<div class="mono" style="color:var(--text-muted);font-size:0.7rem;">${Utils.escapeHtml(p.group)}</div>` : ''}
                     </div>
-                    ${p.name === data.createdBy ? '<span class="badge badge-live" style="margin-left:auto;">HOST</span>' : ''}
+                    ${p.name === data.createdBy ? '<span class="mono" style="margin-left:auto; font-size:0.7rem; color:var(--primary); border:1px solid var(--primary); padding:2px 6px;">HOST</span>' : ''}
                   </div>
                 `).join('')}
               </div>
               ${players.length < 2 ? `
-                <p style="color:var(--text-muted);text-align:center;margin-top:16px;font-size:0.9rem;">
-                  Ожидание ещё хотя бы одного игрока...
+                <p class="mono" style="color:var(--text-muted);text-align:center;margin-top:24px;font-size:0.8rem;">
+                  // AWAITING ADDITIONAL OPERATORS...
                 </p>
               ` : ''}
             </div>
 
             ${isCreator ? `
-              <button id="startBattleBtn" class="btn btn-accent btn-block btn-lg" ${players.length < 2 ? 'disabled style="opacity:0.5;"' : ''}>
-                Начать игру (${players.length} игрок${players.length >= 2 && players.length <= 4 ? 'а' : 'ов'})
+              <button id="startBattleBtn" class="btn btn-block btn-lg" style="background:var(--success); color:var(--bg);" ${players.length < 2 ? 'disabled style="opacity:0.5;"' : ''}>
+                INITIATE SEQUENCE [${players.length} READY]
               </button>
             ` : `
               <div style="text-align:center;color:var(--text-muted);padding:20px;">
-                <div class="battle-waiting-pulse"></div>
-                Ожидание начала игры от хоста...
+                <div class="battle-waiting-pulse" style="width:10px; height:10px; background:var(--primary); border-radius:50%; margin:0 auto 12px; animation:blink 1s infinite;"></div>
+                <div class="mono" style="font-size:0.9rem;">AWAITING HOST SIGNAL...</div>
               </div>
             `}
           </div>
@@ -349,15 +372,15 @@
         }
       }
 
-      window.copyLink = function() {
+      window.copyLink = function () {
         const input = document.getElementById('shareUrl');
         input.select();
         navigator.clipboard.writeText(input.value).then(() => {
-          Utils.showNotification('Ссылка скопирована!', 'success');
-          document.getElementById('copyBtn').textContent = 'Скопировано!';
+          document.getElementById('copyBtn').textContent = 'COPIED';
+          setTimeout(() => document.getElementById('copyBtn').textContent = 'COPY', 2000);
         }).catch(() => {
           document.execCommand('copy');
-          Utils.showNotification('Ссылка скопирована!', 'success');
+          document.getElementById('copyBtn').textContent = 'COPIED';
         });
       };
 
@@ -365,9 +388,9 @@
         let count = 3;
         const render = () => {
           document.getElementById('app').innerHTML = `
-            <div class="battle-countdown-screen">
-              <div class="battle-countdown-number ${count === 0 ? 'go' : ''}">${count === 0 ? 'GO!' : count}</div>
-              <p style="color:var(--text-muted);margin-top:20px;">${battle.testTitle}</p>
+            <div class="battle-countdown-screen" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:80vh;">
+              <div class="battle-countdown-number ${count === 0 ? 'go' : ''}" style="font-size:10rem; font-weight:900; font-family:var(--font-display); line-height:1;">${count === 0 ? 'GO' : count}</div>
+              <p class="mono" style="color:var(--text-muted);margin-top:20px; text-transform:uppercase;">${battle.testTitle}</p>
             </div>
           `;
         };
@@ -411,71 +434,74 @@
         const el = document.getElementById('battle-timer');
         if (!el) return;
         el.textContent = Utils.formatTime(timeLeft);
-        el.className = 'timer';
-        if (timeLeft <= 30) el.classList.add('danger');
-        else if (timeLeft <= 60) el.classList.add('warning');
+        if (timeLeft <= 30) el.style.color = 'var(--danger)';
+        else if (timeLeft <= 60) el.style.color = 'var(--warning)';
       }
 
       function renderBattleQuestion(roomCode) {
         if (showingIntermediateResults) return;
         const q = testData.questions[currentQuestion];
-        const progress = ((currentQuestion + 1) / testData.questions.length) * 100;
+        const progress = ((currentQuestion) / testData.questions.length) * 100;
         const players = battle && battle.players ? Object.values(battle.players) : [];
-        const totalPlayers = players.length;
 
         // Build mini player progress indicators
         const playersProgress = players.map(p => {
           const pct = Math.round((p.answeredCount / testData.questions.length) * 100);
           const isMe = p.id === myPlayerId;
-          return `<div class="battle-mini-player ${isMe ? 'me' : ''}" title="${Utils.escapeHtml(p.name)}">
-            <span class="battle-mini-avatar">${p.name.charAt(0)}</span>
-            <div class="battle-mini-bar"><div class="battle-mini-fill" style="width:${pct}%"></div></div>
+          return `<div class="battle-mini-player ${isMe ? 'me' : ''}" title="${Utils.escapeHtml(p.name)}" style="flex:1; margin-right:4px;">
+            <div style="font-size:0.7rem; margin-bottom:2px;" class="mono">${p.name.charAt(0)}</div>
+            <div class="battle-mini-bar" style="height:4px; background:var(--bg-secondary); position:relative;">
+                <div class="battle-mini-fill" style="position:absolute; top:0; left:0; height:100%; width:${pct}%; background:${isMe ? 'var(--primary)' : 'var(--text-muted)'};"></div>
+            </div>
           </div>`;
         }).join('');
 
         document.getElementById('app').innerHTML = `
-          <div class="battle-test-header">
+          <div class="battle-test-header" style="display:flex; justify-content:space-between; align-items:center; padding: 20px 0; border-bottom: 2px solid var(--text); margin-bottom: 20px;">
             <div class="battle-test-info">
-              <span class="badge badge-live">LIVE</span>
-              <span style="font-weight:600;">${Utils.escapeHtml(testData.title)}</span>
+              <span class="badge mono" style="background:var(--danger); color:white; padding:2px 6px;">LIVE_COMBAT</span>
+              <span style="font-weight:700; margin-left:12px;">${Utils.escapeHtml(testData.title)}</span>
             </div>
-            <div id="battle-timer" class="timer">${Utils.formatTime(timeLeft)}</div>
+            <div id="battle-timer" class="timer" style="font-variant-numeric:tabular-nums; font-weight:700;">${Utils.formatTime(timeLeft)}</div>
           </div>
 
-          <div class="battle-players-progress">${playersProgress}</div>
+          <div class="battle-players-progress" style="display:flex; margin-bottom:40px;">${playersProgress}</div>
 
-          <div class="container slide-in" style="max-width:700px;">
-            <div class="progress-bar-container">
-              <div class="progress-bar" style="width:${progress}%"></div>
+          <div class="container slide-in" style="max-width:900px;">
+            <div class="progress-bar-container" style="height:2px; background:var(--bg-secondary); margin-bottom:40px;">
+              <div class="progress-bar" style="width:${progress}%; height:100%; background:var(--text); transition:width 0.3s ease;"></div>
             </div>
 
-            <div class="question-card card">
-              <div class="question-number">Вопрос ${currentQuestion + 1} из ${testData.questions.length}</div>
-              <div class="question-text">${Utils.escapeHtml(q.text)}</div>
-              <div class="options-list">
+            <div class="question-container">
+               <div class="mono" style="margin-bottom: 16px; color: var(--primary); font-weight: 700;">
+                TARGET ${currentQuestion + 1} / ${testData.questions.length}
+              </div>
+              <div class="question-text" style="font-weight:800; margin-bottom:32px;">${Utils.escapeHtml(q.text)}</div>
+              <div class="options-list" style="display:grid; gap:12px;">
                 ${q.options.map((opt, i) => `
                   <button class="option-btn ${answers[currentQuestion] === i ? 'selected' : ''}"
-                          onclick="battleSelectAnswer(${i})">
-                    <strong>${String.fromCharCode(65 + i)}.</strong> ${Utils.escapeHtml(opt)}
+                          onclick="battleSelectAnswer(${i})" style="text-align:left; padding:16px;">
+                    <span class="mono" style="opacity:0.5; margin-right:12px;">0${i + 1}</span> ${Utils.escapeHtml(opt)}
                   </button>
                 `).join('')}
               </div>
             </div>
 
-            <div class="question-nav">
-              <button onclick="battlePrev()" class="btn btn-outline btn-sm" ${currentQuestion === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : ''}>
-                &#8592; Назад
+            <div class="question-nav" style="margin-top:60px; display:flex; justify-content:space-between; padding-top:24px; border-top:2px solid var(--text);">
+              <button onclick="battlePrev()" class="btn btn-outline btn-sm" ${currentQuestion === 0 ? 'disabled style="opacity:0;pointer-events:none"' : ''}>
+                PREV_TARGET
               </button>
-              <div class="question-dots">
-                ${testData.questions.map((_, i) => `
-                  <button class="question-dot ${i === currentQuestion ? 'active' : ''} ${answers[i] >= 0 ? 'answered' : ''}"
-                          onclick="battleGoTo(${i})">${i + 1}</button>
+              
+              <div style="display:flex; gap:4px;">
+                 ${testData.questions.map((_, i) => `
+                  <div style="width: 6px; height: 6px; background: ${i === currentQuestion ? 'var(--primary)' : answers[i] >= 0 ? 'var(--text)' : '#ddd'};"></div>
                 `).join('')}
               </div>
+
               ${currentQuestion === testData.questions.length - 1 ? `
-                <button onclick="battleFinish()" class="btn btn-accent btn-sm">Завершить &#10003;</button>
+                <button onclick="battleFinish()" class="btn btn-primary btn-sm">EXECUTE</button>
               ` : `
-                <button onclick="battleNext()" class="btn btn-primary btn-sm">Далее &#8594;</button>
+                <button onclick="battleNext()" class="btn btn-sm">NEXT_TARGET</button>
               `}
             </div>
           </div>
@@ -483,7 +509,7 @@
         updateBattleTimer();
       }
 
-      window.battleSelectAnswer = function(index) {
+      window.battleSelectAnswer = function (index) {
         const wasUnanswered = answers[currentQuestion] === -1;
         answers[currentQuestion] = index;
 
@@ -522,7 +548,7 @@
         renderBattleQuestion(roomCode);
       };
 
-      window.battlePrev = function() {
+      window.battlePrev = function () {
         if (currentQuestion > 0) {
           currentQuestion--;
           questionStartTimes[currentQuestion] = Date.now();
@@ -530,7 +556,7 @@
         }
       };
 
-      window.battleNext = function() {
+      window.battleNext = function () {
         if (currentQuestion < testData.questions.length - 1) {
           currentQuestion++;
           questionStartTimes[currentQuestion] = questionStartTimes[currentQuestion] || Date.now();
@@ -538,16 +564,10 @@
         }
       };
 
-      window.battleGoTo = function(index) {
-        currentQuestion = index;
-        questionStartTimes[currentQuestion] = questionStartTimes[currentQuestion] || Date.now();
-        renderBattleQuestion(localStorage.getItem('battle_room'));
-      };
-
-      window.battleFinish = function() {
+      window.battleFinish = function () {
         const unanswered = answers.filter(a => a === -1).length;
         if (unanswered > 0) {
-          if (!confirm('У вас ' + unanswered + ' вопрос(ов) без ответа. Завершить?')) return;
+          if (!confirm('WARNING: ' + unanswered + ' TARGETS REMAINING. CONFIRM EXECUTION?')) return;
         }
         finishBattleTest(localStorage.getItem('battle_room'));
       };
@@ -563,39 +583,32 @@
         });
 
         const renderIntermediate = () => {
-          const medals = ['&#129351;', '&#129352;', '&#129353;']; // gold, silver, bronze
+          const medals = ['1ST', '2ND', '3RD'];
           document.getElementById('app').innerHTML = `
-            <div class="battle-intermediate-overlay">
-              <div class="battle-intermediate-card card fade-in">
+            <div class="battle-intermediate-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; bg:rgba(255,255,255,0.95); z-index:100; display:flex; align-items:center; justify-content:center;">
+              <div class="card fade-in" style="width:100%; max-width:500px; border:4px solid var(--text);">
                 <div style="text-align:center;margin-bottom:20px;">
-                  <h2 style="color:var(--accent);">Промежуточные результаты</h2>
-                  <p style="color:var(--text-muted);">После ${checkpoint} вопросов</p>
+                  <h2 class="mono" style="color:var(--primary); text-transform:uppercase;">CHECKPOINT [${checkpoint}]</h2>
+                  <p class="mono" style="color:var(--text-muted);">STATUS REPORT</p>
                 </div>
 
                 <div class="battle-standings">
                   ${sorted.map((p, i) => {
-                    const isMe = p.id === myPlayerId;
-                    return `
-                      <div class="battle-standing-row ${isMe ? 'is-me' : ''}">
-                        <div class="battle-standing-rank">
-                          ${i < 3 ? medals[i] : (i + 1)}
-                        </div>
-                        <div class="battle-standing-avatar">${p.name.charAt(0).toUpperCase()}</div>
-                        <div class="battle-standing-info">
-                          <div style="font-weight:600;">${Utils.escapeHtml(p.name)} ${isMe ? '<span style="color:var(--primary-light);">(вы)</span>' : ''}</div>
-                          <div style="color:var(--text-muted);font-size:0.8rem;">Ответов: ${p.answeredCount} / ${testData.questions.length}</div>
-                        </div>
-                        <div class="battle-standing-score">
-                          <div style="font-size:1.3rem;font-weight:800;color:var(--success);">${p.correctCount}</div>
-                          <div style="font-size:0.7rem;color:var(--text-muted);">верных</div>
+            const isMe = p.id === myPlayerId;
+            return `
+                      <div class="battle-standing-row ${isMe ? 'is-me' : ''}" style="display:flex; align-items:center; padding:12px; border-bottom:1px solid #eee; ${isMe ? 'background:var(--bg-secondary); font-weight:700;' : ''}">
+                        <div class="mono" style="width:40px; font-weight:700;">${i < 3 ? medals[i] : (i + 1)}</div>
+                        <div style="flex:1;">${Utils.escapeHtml(p.name)}</div>
+                        <div class="mono" style="text-align:right;">
+                          <span style="color:var(--success); font-weight:700;">${p.correctCount}</span>
                         </div>
                       </div>
                     `;
-                  }).join('')}
+          }).join('')}
                 </div>
 
                 <div style="text-align:center;margin-top:24px;">
-                  <button id="continueBtn" class="btn btn-primary btn-lg">Продолжить <span id="countdownSec">(7)</span></button>
+                  <button id="continueBtn" class="btn btn-primary btn-block">RESUME <span id="countdownSec">(7)</span></button>
                 </div>
               </div>
             </div>
@@ -697,27 +710,24 @@
 
           document.getElementById('app').innerHTML = `
             <div class="container fade-in" style="max-width:600px;text-align:center;margin-top:60px;">
-              <div class="card">
-                <h2 style="margin-bottom:16px;">Вы завершили тест!</h2>
-                <p style="color:var(--text-muted);margin-bottom:24px;">Ожидание остальных игроков...</p>
+              <h2 style="margin-bottom:16px;">MISSION COMPLETE</h2>
+              <p class="mono" style="color:var(--text-muted);margin-bottom:40px;">AWAITING ALL UNITS...</p>
 
+              <div class="card">
                 <div class="battle-waiting-players">
                   ${players.map(p => `
-                    <div class="battle-waiting-player ${p.finished ? 'done' : 'playing'}">
-                      <div class="battle-player-avatar">${p.name.charAt(0).toUpperCase()}</div>
-                      <span style="font-weight:600;">${Utils.escapeHtml(p.name)}</span>
+                    <div class="battle-waiting-player" style="display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
+                      <div class="battle-player-avatar" style="width:30px; height:30px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; margin-right:12px; font-weight:700;">${p.name.charAt(0).toUpperCase()}</div>
+                      <span style="font-weight:700;">${Utils.escapeHtml(p.name)}</span>
                       ${p.finished
-                        ? '<span style="color:var(--success);margin-left:auto;">&#10003; Готов</span>'
-                        : '<span style="color:var(--warning);margin-left:auto;">&#9881; Играет...</span>'}
+              ? '<span class="mono" style="color:var(--success);margin-left:auto; font-size:0.8rem;">READY</span>'
+              : '<span class="mono" style="color:var(--text-muted);margin-left:auto; font-size:0.8rem;">ACTIVE...</span>'}
                     </div>
                   `).join('')}
                 </div>
 
-                <div style="margin-top:20px;color:var(--text-muted);">
-                  ${finished} / ${total} завершили
-                </div>
-                <div class="progress-bar-container" style="margin-top:12px;">
-                  <div class="progress-bar" style="width:${(finished/total)*100}%"></div>
+                <div style="margin-top:20px;color:var(--text-muted);" class="mono">
+                  ${finished} / ${total} REPORTING
                 </div>
               </div>
             </div>
@@ -750,9 +760,7 @@
         });
 
         const topCount = Math.min(sorted.length, 3);
-        const medals = ['&#129351;', '&#129352;', '&#129353;'];
-        const medalLabels = ['1-е место', '2-е место', '3-е место'];
-        const podiumColors = ['var(--gold)', 'var(--silver)', 'var(--bronze)'];
+        const medals = ['1', '2', '3']; // Minimalist
 
         // Build podium (reorder for visual: 2nd, 1st, 3rd)
         let podiumOrder = [];
@@ -766,61 +774,61 @@
 
         document.getElementById('app').innerHTML = `
           ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
-          <div class="container fade-in" style="max-width:700px;">
-            <div style="text-align:center;margin:30px 0 20px;">
-              <h1 class="battle-title-glow">Результаты Battle</h1>
-              <p style="color:var(--text-muted);">${Utils.escapeHtml(battle.testTitle)}</p>
+          <div class="container fade-in" style="max-width:800px;">
+            <div style="text-align:center;margin:30px 0 40px;">
+              <h1 class="battle-glow" style="margin-bottom:8px;">DEBRIEFING</h1>
+              <p class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(battle.testTitle)}</p>
             </div>
 
             <div class="battle-podium">
               ${podiumOrder.map(p => {
-                const r = p.rank;
-                const isMe = p.id === myPlayerId;
-                const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
-                return `
+          const r = p.rank;
+          const isMe = p.id === myPlayerId;
+          const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
+          // Height based on rank
+          const barHeight = r === 0 ? 250 : r === 1 ? 180 : 120;
+
+          return `
                   <div class="battle-podium-item rank-${r} ${isMe ? 'is-me' : ''}">
-                    <div class="battle-podium-medal">${medals[r]}</div>
-                    <div class="battle-podium-avatar" style="border-color:${podiumColors[r]};">${p.name.charAt(0).toUpperCase()}</div>
-                    <div class="battle-podium-name">${Utils.escapeHtml(p.name)}</div>
-                    <div class="battle-podium-score">${p.correctCount}/${totalQ}</div>
-                    <div class="battle-podium-pct">${score}%</div>
-                    <div class="battle-podium-time">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</div>
-                    <div class="battle-podium-label" style="color:${podiumColors[r]};">${medalLabels[r]}</div>
-                    <div class="battle-podium-bar" style="height:${r === 0 ? 120 : r === 1 ? 90 : 60}px;background:${podiumColors[r]};"></div>
+                    <div style="font-weight:700; text-transform:uppercase; margin-bottom:8px;">${Utils.escapeHtml(p.name)}</div>
+                    <div class="battle-podium-bar" style="height:${barHeight}px; width:80px; background:${r === 0 ? 'var(--primary)' : 'var(--text)'}; color:var(--bg); display:flex; align-items:flex-end; justify-content:center; padding-bottom:12px; font-weight:800; font-size:2rem;">
+                      ${medals[r]}
+                    </div>
+                    <div style="margin-top:12px; font-weight:700; color:var(--primary); font-size:1.2rem;">${p.correctCount} / ${totalQ}</div>
+                    <div class="mono" style="color:var(--text-muted); font-size:0.8rem;">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</div>
                   </div>
                 `;
-              }).join('')}
+        }).join('')}
             </div>
 
             ${sorted.length > 3 ? `
-              <div class="card" style="margin-top:20px;">
-                <div class="card-header">Все участники</div>
+              <div class="card" style="margin-top:40px;">
+                <div class="card-header">UNIT_PERFORMANCE</div>
                 <table class="leaderboard-table">
                   <thead>
-                    <tr><th>#</th><th>Игрок</th><th style="text-align:right;">Баллы</th><th style="text-align:right;">Время</th></tr>
+                    <tr><th class="mono">RANK</th><th>OPERATOR</th><th style="text-align:right;">DATA</th><th style="text-align:right;">TIME</th></tr>
                   </thead>
                   <tbody>
                     ${sorted.map((p, i) => {
-                      const isMe = p.id === myPlayerId;
-                      const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
-                      return `
-                        <tr class="${isMe ? 'highlight-row' : ''}">
-                          <td class="rank-cell ${i < 3 ? 'rank-' + (i+1) : ''}">${i < 3 ? medals[i] : (i + 1)}</td>
-                          <td class="name-cell">${Utils.escapeHtml(p.name)} ${isMe ? '(вы)' : ''}</td>
+          const isMe = p.id === myPlayerId;
+          const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
+          return `
+                        <tr class="${isMe ? 'highlight-row' : ''}" style="${isMe ? 'background:var(--bg-secondary);' : ''}">
+                          <td class="rank-cell mono">${i + 1}</td>
+                          <td class="name-cell" style="font-weight:700;">${Utils.escapeHtml(p.name)}</td>
                           <td class="score-cell">${p.correctCount}/${totalQ} (${score}%)</td>
                           <td class="time-cell">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</td>
                         </tr>
                       `;
-                    }).join('')}
+        }).join('')}
                   </tbody>
                 </table>
               </div>
             ` : ''}
 
-            <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;justify-content:center;">
-              <a href="battle.html" class="btn btn-accent">Новая игра</a>
-              <a href="tests.html" class="btn btn-outline">К тестам</a>
-              <a href="leaderboard.html?test=${battle.testId}" class="btn btn-outline">Общий рейтинг</a>
+            <div style="display:flex;gap:12px;margin-top:40px;flex-wrap:wrap;justify-content:center; padding-bottom: 60px;">
+              <a href="battle.html" class="btn btn-block" style="background:var(--primary); color:white;">NEW SESSION</a>
+              <a href="tests.html" class="btn btn-outline btn-block">RETURN TO BASE</a>
             </div>
           </div>
         `;
@@ -834,4 +842,5 @@
     })();
   </script>
 </body>
+
 </html>

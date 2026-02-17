@@ -1,22 +1,34 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Админ-панель — TestArena</title>
+  <title>Admin_Console // TestArena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
-  <div id="app"></div>
+  <div id="app" class="container"></div>
 
   <!-- Modal for confirmation -->
   <div id="confirmModal" class="modal-overlay">
     <div class="modal">
-      <h2 id="modalTitle">Подтверждение</h2>
-      <p id="modalText"></p>
-      <div class="modal-actions">
-        <button id="modalCancel" class="btn btn-outline">Отмена</button>
-        <button id="modalConfirm" class="btn btn-danger">Удалить</button>
+      <div class="card-header">
+        <span>CONFIRM ACTION</span>
+        <span style="color:var(--danger)">CAUTION</span>
+      </div>
+      <h2 id="modalTitle" style="margin-bottom: var(--gap); font-size: 2rem;">Confirm?</h2>
+      <p id="modalText" class="mono" style="margin-bottom: var(--gap);"></p>
+      <div class="modal-actions" style="display:flex; gap:12px; justify-content: flex-end;">
+        <button id="modalCancel" class="btn btn-outline">CANCEL</button>
+        <button id="modalConfirm" class="btn"
+          style="background:var(--danger); color:white; border:none;">EXECUTE</button>
       </div>
     </div>
   </div>
@@ -31,7 +43,7 @@
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
-    (function() {
+    (function () {
       const user = Utils.requireAuth();
       if (!user || user.role !== 'admin') {
         window.location.href = 'index.html';
@@ -44,18 +56,29 @@
       render();
 
       function render() {
-        document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'admin')}
-          <div class="container-wide fade-in">
-            <h2 style="margin:24px 0 16px;">Панель администратора</h2>
+        // Custom Header for Admin
+        const headerHtml = `
+          <header style="padding: 24px 0; border-bottom: 2px solid var(--text); margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; text-transform: uppercase;">
+              TestArena <span style="color: var(--primary)">//</span> ADMIN
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.9rem;">
+              OPERATOR: ${Utils.escapeHtml(user.name)}
+              <a href="#" onclick="Storage.logout()" style="margin-left: 12px; color: var(--danger); border-bottom: 1px solid currentColor;">LOGOUT</a>
+            </div>
+          </header>
+        `;
 
+        document.getElementById('app').innerHTML = `
+          ${headerHtml}
+          <div class="fade-in">
             <div class="tabs">
-              <button class="tab ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">Мои тесты</button>
+              <button class="tab ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">TEST_MODULES</button>
               <button class="tab ${currentTab === 'editor' ? 'active' : ''}" onclick="switchTab('editor')">
-                ${editingTest ? 'Редактирование' : 'Новый тест'}
+                ${editingTest ? 'EDIT_MODE' : 'CREATE_NEW'}
               </button>
-              <button class="tab ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">Результаты</button>
-              <button class="tab ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">Настройки</button>
+              <button class="tab ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">DATA_LOGS</button>
+              <button class="tab ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">SYSTEM</button>
             </div>
 
             <div id="tabContent"></div>
@@ -70,7 +93,7 @@
         }
       }
 
-      window.switchTab = function(tab) {
+      window.switchTab = function (tab) {
         currentTab = tab;
         if (tab === 'editor' && !editingTest) {
           editingTest = createEmptyTest();
@@ -82,55 +105,57 @@
       function renderTestsList() {
         const tests = Storage.getTests();
         document.getElementById('tabContent').innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <p style="color:var(--text-muted);">Всего тестов: ${tests.length}</p>
-            <button onclick="createNewTest()" class="btn btn-primary btn-sm">+ Создать тест</button>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+            <p class="mono" style="color:var(--text-muted);">TOTAL_MODULES: <span style="color:var(--text); font-weight:700;">${tests.length}</span></p>
+            <button onclick="createNewTest()" class="btn">+ INITIALIZE TEST</button>
           </div>
           ${tests.length === 0 ? `
             <div class="empty-state">
-              <div class="empty-state-icon">&#128203;</div>
-              <p>Тестов пока нет. Создайте первый!</p>
+              <div class="empty-state-icon">!</div>
+              <p>NO MODULES FOUND. INITIALIZE NEW SEQUENCE.</p>
             </div>
           ` : `
-            <div class="test-grid">
+            <div class="test-grid" style="border-top: none; padding-top: 0;">
               ${tests.map(test => {
-                const results = Storage.getResultsForTest(test.id);
-                return `
+          const results = Storage.getResultsForTest(test.id);
+          return `
                   <div class="test-card">
-                    <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
-                    <div class="test-card-meta">
-                      <span>&#128221; ${test.questions.length} вопросов</span>
-                      <span>&#9201; ${Utils.formatTime(test.timeLimit)}</span>
-                      <span>&#128101; ${results.length} попыток</span>
+                    <div>
+                      <div class="test-card-title" style="font-size: 1.5rem;">${Utils.escapeHtml(test.title)}</div>
+                      <div class="test-card-meta" style="flex-direction: column; gap: 4px; border-top:none; margin: 12px 0;">
+                        <span>Q_COUNT: ${test.questions.length}</span>
+                        <span>T_LIMIT: ${Utils.formatTime(test.timeLimit)}</span>
+                        <span>ATTEMPTS: ${results.length}</span>
+                      </div>
                     </div>
-                    <div class="test-card-actions">
-                      <button onclick="editTest('${test.id}')" class="btn btn-sm btn-outline">Редактировать</button>
-                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-sm btn-danger">Удалить</button>
+                    <div class="test-card-actions" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px;">EDIT</button>
+                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-outline" style="padding: 8px; color: var(--danger); border-color: var(--danger);">DELETE</button>
                     </div>
                   </div>
                 `;
-              }).join('')}
+        }).join('')}
             </div>
           `}
         `;
       }
 
-      window.createNewTest = function() {
+      window.createNewTest = function () {
         editingTest = createEmptyTest();
         currentTab = 'editor';
         render();
       };
 
-      window.editTest = function(id) {
+      window.editTest = function (id) {
         editingTest = JSON.parse(JSON.stringify(Storage.getTest(id)));
         currentTab = 'editor';
         render();
       };
 
-      window.confirmDeleteTest = function(id, title) {
-        showConfirmModal(`Удалить тест "${title}"?`, 'Все результаты этого теста также будут удалены.', () => {
+      window.confirmDeleteTest = function (id, title) {
+        showConfirmModal(`DELETE MODULE "${title}"?`, 'IRREVERSIBLE DATA LOSS. CONFIRM DELETION.', () => {
           Storage.deleteTest(id);
-          Utils.showNotification('Тест удалён', 'success');
+          Utils.showNotification('MODULE DELETED', 'success');
           render();
         });
       };
@@ -160,38 +185,41 @@
         if (!editingTest) return;
         const t = editingTest;
         document.getElementById('tabContent').innerHTML = `
-          <div class="card" style="margin-bottom:20px;">
-            <div class="form-group">
-              <label>Название теста</label>
-              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="Например: JavaScript Основы">
+          <div class="card">
+            <div class="card-header">
+              <span>MODULE CONFIGURATION</span>
+              <span>ID: ${t.id.substring(0, 8)}</span>
             </div>
             <div class="form-group">
-              <label>Описание</label>
-              <textarea id="testDesc" class="form-control" rows="2" placeholder="Краткое описание теста">${Utils.escapeHtml(t.description || '')}</textarea>
+              <label>Designation (Title)</label>
+              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="e.g. JS_BASICS_V1">
             </div>
             <div class="form-group">
-              <label>Время на тест (секунды)</label>
+              <label>Briefing (Description)</label>
+              <textarea id="testDesc" class="form-control" rows="2" style="font-size: 1rem; font-family: var(--font-body);">${Utils.escapeHtml(t.description || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Time Constraint (Seconds)</label>
               <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:200px;">
             </div>
           </div>
 
-          <h3 style="margin-bottom:16px;">Вопросы (${t.questions.length})</h3>
+          <h3 style="margin-bottom:24px; border-bottom: 2px solid var(--text); padding-bottom: 12px;">Data Points (${t.questions.length})</h3>
 
           <div id="questionsList">
             ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
           </div>
 
-          <button onclick="addQuestion()" class="btn btn-outline btn-block" style="margin:16px 0;">
-            + Добавить вопрос
+          <button onclick="addQuestion()" class="btn btn-outline btn-block" style="margin:24px 0;">
+            + APPEND DATA POINT
           </button>
 
-          <div style="display:flex; gap:12px; margin-top:20px;">
-            <button onclick="saveTest()" class="btn btn-primary btn-lg">Сохранить тест</button>
-            <button onclick="switchTab('tests')" class="btn btn-outline">Отмена</button>
+          <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-top:40px; padding-top: 20px; border-top: 2px solid var(--text);">
+            <button onclick="saveTest()" class="btn" style="background: var(--primary); color: white;">SAVE MODULE</button>
+            <button onclick="switchTab('tests')" class="btn btn-outline">DISCARD</button>
           </div>
         `;
 
-        // Bind input listeners
         document.getElementById('testTitle').addEventListener('input', (e) => { editingTest.title = e.target.value; });
         document.getElementById('testDesc').addEventListener('input', (e) => { editingTest.description = e.target.value; });
         document.getElementById('testTime').addEventListener('input', (e) => { editingTest.timeLimit = parseInt(e.target.value) || 300; });
@@ -199,25 +227,25 @@
 
       function renderQuestionEditor(q, qi) {
         return `
-          <div class="question-editor" data-qi="${qi}">
-            <div class="question-editor-header">
-              <strong>Вопрос ${qi + 1}</strong>
+          <div class="card" data-qi="${qi}" style="box-shadow: none; border-color: #E5E5E5;">
+            <div class="card-header" style="border-bottom: 1px solid #E5E5E5; margin-bottom: 12px; padding-bottom: 8px;">
+              <span>POINT_${qi + 1}</span>
               ${editingTest.questions.length > 1 ? `
-                <button class="remove-question-btn" onclick="removeQuestion(${qi})" title="Удалить вопрос">&#10006;</button>
+                <button class="remove-question-btn" onclick="removeQuestion(${qi})" style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:700;">REMOVE</button>
               ` : ''}
             </div>
             <div class="form-group">
               <input type="text" class="form-control q-text" data-qi="${qi}"
-                     value="${Utils.escapeHtml(q.text)}" placeholder="Текст вопроса">
+                     value="${Utils.escapeHtml(q.text)}" placeholder="Query Text..." style="font-size: 1.2rem;">
             </div>
             <div class="options-editor">
               ${q.options.map((opt, oi) => `
-                <div class="option-editor-row">
+                <div class="option-editor-row" style="margin-bottom: 8px;">
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
-                         onchange="setCorrect(${qi}, ${oi})">
+                         onchange="setCorrect(${qi}, ${oi})" style="width: 24px; height: 24px; accent-color: var(--primary);">
                   <input type="text" class="form-control q-option" data-qi="${qi}" data-oi="${oi}"
-                         value="${Utils.escapeHtml(opt)}" placeholder="Вариант ${String.fromCharCode(65 + oi)}">
-                  <span class="correct-label">${q.correct === oi ? '&#9989;' : ''}</span>
+                         value="${Utils.escapeHtml(opt)}" placeholder="Option ${String.fromCharCode(65 + oi)}" style="font-size: 1rem; padding: 12px;">
+                  <span class="correct-label mono" style="width: 30px; text-align: center;">${q.correct === oi ? 'TRUE' : ''}</span>
                 </div>
               `).join('')}
             </div>
@@ -225,7 +253,6 @@
         `;
       }
 
-      // Use event delegation for question inputs
       document.addEventListener('input', (e) => {
         if (e.target.classList.contains('q-text')) {
           const qi = parseInt(e.target.dataset.qi);
@@ -242,43 +269,27 @@
         }
       });
 
-      window.setCorrect = function(qi, oi) {
-        if (editingTest && editingTest.questions[qi]) {
-          editingTest.questions[qi].correct = oi;
-          renderEditor();
-        }
+      window.setCorrect = function (qi, oi) {
+        if (editingTest && editingTest.questions[qi]) editingTest.questions[qi].correct = oi;
+        renderEditor();
       };
-
-      window.addQuestion = function() {
+      window.addQuestion = function () {
         editingTest.questions.push(createEmptyQuestion());
         renderEditor();
-        // Scroll to new question
         const list = document.getElementById('questionsList');
         if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
       };
-
-      window.removeQuestion = function(qi) {
+      window.removeQuestion = function (qi) {
         editingTest.questions.splice(qi, 1);
         renderEditor();
       };
-
-      window.saveTest = function() {
+      window.saveTest = function () {
         const t = editingTest;
-        if (!t.title.trim()) {
-          Utils.showNotification('Введите название теста', 'error');
-          return;
-        }
-        if (t.questions.some(q => !q.text.trim())) {
-          Utils.showNotification('Заполните текст всех вопросов', 'error');
-          return;
-        }
-        if (t.questions.some(q => q.options.some(o => !o.trim()))) {
-          Utils.showNotification('Заполните все варианты ответов', 'error');
-          return;
-        }
-
+        if (!t.title.trim()) { Utils.showNotification('TITLE_REQUIRED', 'error'); return; }
+        if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('MISSING_QUERY_TEXT', 'error'); return; }
+        if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('INCOMPLETE_OPTIONS', 'error'); return; }
         Storage.saveTest(t);
-        Utils.showNotification('Тест сохранён!', 'success');
+        Utils.showNotification('MODULE_SAVED', 'success');
         editingTest = null;
         currentTab = 'tests';
         render();
@@ -290,28 +301,31 @@
         const allResults = Storage.getResults();
 
         document.getElementById('tabContent').innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <p style="color:var(--text-muted);">Всего попыток: ${allResults.length}</p>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+            <p class="mono">TOTAL_RECORDS: ${allResults.length}</p>
             ${allResults.length > 0 ? `
-              <button onclick="confirmClearResults()" class="btn btn-danger btn-sm">Очистить все результаты</button>
+              <button onclick="confirmClearResults()" class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);">PURGE ALL DATA</button>
             ` : ''}
           </div>
 
           ${tests.map(test => {
-            const results = Storage.getResultsForTest(test.id);
-            if (results.length === 0) return '';
-            return `
-              <div class="card" style="margin-bottom:16px;">
-                <div class="card-header">${Utils.escapeHtml(test.title)} <span style="color:var(--text-muted); font-weight:400;">(${results.length} попыток)</span></div>
+          const results = Storage.getResultsForTest(test.id);
+          if (results.length === 0) return '';
+          return `
+              <div class="card" style="margin-bottom:24px;">
+                <div class="card-header">
+                  <span>${Utils.escapeHtml(test.title)}</span>
+                  <span>COUNT: ${results.length}</span>
+                </div>
                 <table class="leaderboard-table">
                   <thead>
                     <tr>
-                      <th style="text-align:center;">#</th>
-                      <th>Участник</th>
-                      <th>Группа</th>
-                      <th style="text-align:right;">Балл</th>
-                      <th style="text-align:right;">Время</th>
-                      <th style="text-align:right;">Дата</th>
+                      <th style="text-align:center;">RANK</th>
+                      <th>IDENTIFIER</th>
+                      <th>UNIT</th>
+                      <th style="text-align:right;">RATING</th>
+                      <th style="text-align:right;">TIME</th>
+                      <th style="text-align:right;">TIMESTAMP</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -319,24 +333,24 @@
                       <tr>
                         <td class="rank-cell rank-${i + 1}">${i + 1}</td>
                         <td class="name-cell">${Utils.escapeHtml(r.userName)}</td>
-                        <td style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
+                        <td class="mono" style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
                         <td class="score-cell">${r.score}%</td>
                         <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
-                        <td style="color:var(--text-muted); text-align:right; font-size:0.85rem;">${new Date(r.completedAt).toLocaleString('ru')}</td>
+                        <td class="mono" style="color:var(--text-muted); text-align:right; font-size:0.85rem;">${new Date(r.completedAt).toLocaleDateString()}</td>
                       </tr>
                     `).join('')}
                   </tbody>
                 </table>
               </div>
             `;
-          }).join('') || '<div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>Результатов пока нет.</p></div>'}
+        }).join('') || '<div class="empty-state"><div class="empty-state-icon">!</div><p>NO DATA RECORDS</p></div>'}
         `;
       }
 
-      window.confirmClearResults = function() {
-        showConfirmModal('Очистить все результаты?', 'Это действие нельзя отменить.', () => {
+      window.confirmClearResults = function () {
+        showConfirmModal('PURGE ALL DATA?', 'IRREVERSIBLE. CONFIRM.', () => {
           Storage.clearAllResults();
-          Utils.showNotification('Результаты очищены', 'success');
+          Utils.showNotification('DATABASE PURGED', 'success');
           render();
         });
       };
@@ -346,66 +360,54 @@
         const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
         document.getElementById('tabContent').innerHTML = `
           <div class="card" style="max-width:500px;">
-            <div class="card-header">Настройки</div>
+            <div class="card-header">SYSTEM CONFIG</div>
             <div class="form-group">
-              <label>Пароль администратора</label>
+              <label>Administrator Key</label>
               <input type="text" id="adminPass" class="form-control" value="${Utils.escapeHtml(currentPassword)}">
             </div>
-            <button onclick="saveSettings()" class="btn btn-primary">Сохранить</button>
+            <button onclick="saveSettings()" class="btn btn-block">SAVE CONFIG</button>
 
-            <div style="margin-top:32px; padding-top:20px; border-top:1px solid var(--border);">
-              <h3 style="margin-bottom:12px; color:var(--danger);">Опасная зона</h3>
-              <button onclick="confirmResetAll()" class="btn btn-danger">Сбросить все данные</button>
+            <div style="margin-top:40px; padding-top:20px; border-top:2px solid var(--danger);">
+              <h3 style="margin-bottom:12px; color:var(--danger); font-family:var(--font-mono);">DANGER ZONE</h3>
+              <button onclick="confirmResetAll()" class="btn btn-block" style="background:var(--danger); color:white;">FACTORY RESET</button>
             </div>
           </div>
         `;
       }
 
-      window.saveSettings = function() {
+      window.saveSettings = function () {
         const pass = document.getElementById('adminPass').value.trim();
-        if (!pass) {
-          Utils.showNotification('Пароль не может быть пустым', 'error');
-          return;
-        }
+        if (!pass) { Utils.showNotification('KEY_REQUIRED', 'error'); return; }
         localStorage.setItem('ct_admin_password', pass);
-        Utils.showNotification('Настройки сохранены!', 'success');
+        Utils.showNotification('CONFIG SAVED', 'success');
       };
 
-      window.confirmResetAll = function() {
-        showConfirmModal('Сбросить ВСЕ данные?', 'Будут удалены все тесты, результаты и настройки. Это нельзя отменить!', () => {
+      window.confirmResetAll = function () {
+        showConfirmModal('FACTORY RESET?', 'COMPLETE SYSTEM WIPE. CONFIRM.', () => {
           Storage.resetAllData();
-          Utils.showNotification('Все данные сброшены', 'success');
+          Utils.showNotification('SYSTEM RESET', 'success');
           render();
         });
       };
 
-      // ——— Modal ———
       function showConfirmModal(title, text, onConfirm) {
         const modal = document.getElementById('confirmModal');
         document.getElementById('modalTitle').textContent = title;
         document.getElementById('modalText').textContent = text;
         modal.classList.add('active');
-
         const confirmBtn = document.getElementById('modalConfirm');
         const cancelBtn = document.getElementById('modalCancel');
-
         const cleanup = () => {
           modal.classList.remove('active');
           confirmBtn.replaceWith(confirmBtn.cloneNode(true));
           cancelBtn.replaceWith(cancelBtn.cloneNode(true));
         };
-
-        document.getElementById('modalConfirm').addEventListener('click', () => {
-          cleanup();
-          onConfirm();
-        });
-
+        document.getElementById('modalConfirm').addEventListener('click', () => { cleanup(); onConfirm(); });
         document.getElementById('modalCancel').addEventListener('click', cleanup);
-        modal.addEventListener('click', (e) => {
-          if (e.target === modal) cleanup();
-        });
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
       }
     })();
   </script>
 </body>
+
 </html>

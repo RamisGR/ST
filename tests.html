@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Тесты — TestArena</title>
+  <title>Test_Modules // TestArena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
-  <div id="app"></div>
+  <div id="app" class="container"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -19,67 +26,85 @@
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
-    (function() {
+    (function () {
       const user = Utils.requireAuth();
       if (!user) return;
 
       render();
 
       function render() {
+        // We can create a header with a logout button here too
+        const headerHtml = `
+          <header style="padding: 24px 0; border-bottom: 2px solid var(--text); margin-bottom: 40px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-family: var(--font-display); font-weight: 900; font-size: 1.5rem; text-transform: uppercase;">
+              TestArena <span style="color: var(--primary)">.</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 0.9rem;">
+              UNIT: ${Utils.escapeHtml(user.name)}
+              <a href="#" onclick="Storage.logout()" style="margin-left: 12px; color: var(--danger); border-bottom: 1px solid currentColor;">EJECT</a>
+            </div>
+          </header>
+        `;
+
         const tests = Storage.getTests();
         const userResults = Storage.getUserResults(user.name);
         const completedTestIds = new Set(userResults.map(r => r.testId));
 
         document.getElementById('app').innerHTML = `
-          ${Utils.renderHeader(user, 'tests')}
-          <div class="container fade-in">
-            <h2 style="margin:24px 0 8px;">Доступные тесты</h2>
-            <p style="color:var(--text-muted); margin-bottom:20px;">Выберите тест для прохождения. Соревнуйтесь с другими участниками!</p>
+          ${headerHtml}
+          <div class="fade-in">
+            <h2 style="margin:0 0 8px;">AVAILABLE_MODULES</h2>
+            <p class="mono" style="color:var(--text-muted); margin-bottom:40px;">SELECT SEQUENCE. COMPETE.</p>
 
             ${tests.length === 0 ? `
               <div class="empty-state">
-                <div class="empty-state-icon">&#128203;</div>
-                <p>Тестов пока нет. Попросите администратора создать тесты.</p>
+                <div class="empty-state-icon">!</div>
+                <p>NO MODULES DETECTED. STANDBY.</p>
               </div>
             ` : `
               <div class="test-grid">
                 ${tests.map(test => {
-                  const completed = completedTestIds.has(test.id);
-                  const results = Storage.getResultsForTest(test.id);
-                  const myResult = userResults.find(r => r.testId === test.id);
-                  return `
+          const completed = completedTestIds.has(test.id);
+          const results = Storage.getResultsForTest(test.id);
+          const myResult = userResults.find(r => r.testId === test.id);
+          return `
                     <div class="test-card">
-                      <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
-                      <div class="test-card-meta">
-                        <span>&#128221; ${test.questions.length} вопросов</span>
-                        <span>&#9201; ${Utils.formatTime(test.timeLimit)}</span>
-                        <span>&#128101; ${results.length} попыток</span>
-                        ${completed ? `<br><span style="color:var(--success);">&#9989; Пройден (${myResult ? myResult.score + '%' : ''})</span>` : ''}
+                      <div>
+                        <div class="test-card-title">${Utils.escapeHtml(test.title)}</div>
+                        <div class="test-card-meta" style="flex-direction: column; gap: 4px; border-top:none; margin: 12px 0;">
+                          <span>Q_COUNT: ${test.questions.length}</span>
+                          <span>T_LIMIT: ${Utils.formatTime(test.timeLimit)}</span>
+                          <span>ATTEMPTS: ${results.length}</span>
+                        </div>
                       </div>
-                      <div class="test-card-actions">
-                        <button onclick="startTest('${test.id}')" class="btn btn-sm ${completed ? 'btn-outline' : 'btn-primary'}">
-                          ${completed ? 'Пройти снова' : 'Начать тест'}
+                      
+                      ${completed
+              ? `<div style="margin-bottom:12px; font-family:var(--font-mono); font-weight:700; color:var(--success);">STATUS: COMPLETE (${myResult.score}%)</div>`
+              : ''}
+
+                      <div class="test-card-actions" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button onclick="startTest('${test.id}')" class="btn ${completed ? 'btn-outline' : ''}" style="width:100%;">
+                          ${completed ? 'RETRY' : 'START'}
                         </button>
-                        <a href="battle.html" onclick="event.preventDefault();startBattle('${test.id}')" class="btn btn-sm btn-accent">Battle</a>
-                        <a href="leaderboard.html?test=${test.id}" class="btn btn-sm btn-outline">Рейтинг</a>
+                        <a href="leaderboard.html?test=${test.id}" class="btn btn-outline" style="text-align:center; padding-top:16px;">RANKING</a>
                       </div>
+                      <a href="battle.html" class="btn btn-outline btn-block" style="margin-top:8px; border-color:var(--primary); color:var(--primary);">
+                        BATTLE MODE
+                      </a>
                     </div>
                   `;
-                }).join('')}
+        }).join('')}
               </div>
             `}
           </div>
         `;
       }
 
-      window.startTest = function(testId) {
+      window.startTest = function (testId) {
         window.location.href = `test.html?id=${testId}`;
-      };
-
-      window.startBattle = function(testId) {
-        window.location.href = `battle.html`;
       };
     })();
   </script>
 </body>
+
 </html>

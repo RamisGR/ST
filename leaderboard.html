@@ -1,53 +1,69 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Рейтинг — TestArena</title>
+  <title>Global_Ranking // TestArena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&family=Chivo+Mono:ital,wght@0,100..900;1,100..900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <style>
     .live-indicator {
       display: inline-block;
-      width: 8px; height: 8px;
-      background: var(--success);
-      border-radius: 50%;
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
       margin-right: 6px;
-      animation: pulse 1.5s infinite;
+      animation: blink 1s infinite alternate;
     }
+
+    @keyframes blink {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0.3;
+      }
+    }
+
     .live-bar {
-      background: linear-gradient(135deg, rgba(0,184,148,0.1), rgba(0,206,201,0.1));
-      border: 1px solid rgba(0,184,148,0.3);
-      border-radius: var(--radius);
-      padding: 16px 20px;
-      margin-bottom: 20px;
+      border: 2px solid var(--primary);
+      background: var(--bg);
+      padding: 16px;
+      margin-bottom: 24px;
     }
+
     .live-bar-title {
+      font-family: var(--font-mono);
       font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--success);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
     }
+
     .live-user {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: var(--bg-input);
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      margin: 3px 4px;
-    }
-    .auto-refresh-note {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--text-muted);
+      gap: 8px;
+      border: 1px solid var(--text);
+      padding: 4px 8px;
+      font-family: var(--font-mono);
       font-size: 0.8rem;
-      margin-left: 12px;
+      margin: 4px;
+      text-transform: uppercase;
     }
   </style>
 </head>
+
 <body>
-  <div id="app"></div>
+  <div id="app" class="container"></div>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -60,7 +76,7 @@
   <script>
     Storage.initFirebase();
 
-    (function() {
+    (function () {
       const user = Utils.requireAuth();
       if (!user) return;
 
@@ -87,21 +103,21 @@
         document.getElementById('app').innerHTML = `
           ${Utils.renderHeader(user, 'leaderboard')}
           <div class="container fade-in">
-            <div style="display:flex; align-items:center; flex-wrap:wrap; margin:24px 0 16px;">
-              <h2>Рейтинг участников</h2>
+            <div style="display:flex; align-items:center; justify-content: space-between; flex-wrap:wrap; margin:0 0 24px;">
+              <h2 style="margin:0;">GLOBAL_RANKING</h2>
               ${Storage.isOnline() ? `
-                <span class="auto-refresh-note">
-                  <span class="live-indicator"></span> Обновляется автоматически
-                </span>
+                <div class="mono" style="font-size: 0.8rem; color: var(--primary);">
+                   ● LIVE_DATA_STREAM_ACTIVE
+                </div>
               ` : ''}
             </div>
 
             <div id="live-bar-container"></div>
 
-            <div style="margin-bottom:24px;">
+            <div style="margin-bottom:32px;">
               <div class="tabs">
                 <button class="tab ${!selectedTestId ? 'active' : ''}" onclick="window.location.href='leaderboard.html'">
-                  Общий
+                  OVERALL_STANDING
                 </button>
                 ${tests.map(t => `
                   <button class="tab ${selectedTestId === t.id ? 'active' : ''}"
@@ -143,14 +159,13 @@
           <div class="live-bar">
             <div class="live-bar-title">
               <span class="live-indicator"></span>
-              Сейчас проходят тест: ${relevant.length} чел.
+              ACTIVE_AGENTS [${relevant.length}]
             </div>
             <div>
               ${relevant.map(s => `
                 <span class="live-user">
-                  <span class="live-indicator"></span>
                   ${Utils.escapeHtml(s.userName)}
-                  ${s.testTitle ? `<small style="color:var(--text-muted);">— ${Utils.escapeHtml(s.testTitle)}</small>` : ''}
+                  ${s.testTitle ? `<span style="color:var(--text-muted); border-left: 1px solid var(--text-muted); padding-left: 6px; margin-left: 2px;">${Utils.escapeHtml(s.testTitle)}</span>` : ''}
                 </span>
               `).join('')}
             </div>
@@ -160,15 +175,15 @@
 
       function renderTestLeaderboard(testId) {
         const test = Storage.getTest(testId);
-        if (!test) return '<div class="empty-state"><p>Тест не найден</p></div>';
+        if (!test) return '<div class="empty-state"><p>MODULE NOT FOUND</p></div>';
 
         const results = Storage.getResultsForTest(testId);
         if (results.length === 0) {
           return `
             <div class="empty-state">
-              <div class="empty-state-icon">&#127942;</div>
-              <p>Пока никто не прошёл этот тест. Будьте первым!</p>
-              <a href="test.html?id=${testId}" class="btn btn-primary" style="margin-top:16px;">Пройти тест</a>
+              <div class="empty-state-icon">!</div>
+              <p>NO DATA RECORDS.</p>
+              <a href="test.html?id=${testId}" class="btn" style="margin-top:16px;">INITIATE SEQUENCE</a>
             </div>
           `;
         }
@@ -177,7 +192,7 @@
         const bestByUser = {};
         results.forEach(r => {
           if (!bestByUser[r.userName] || r.score > bestByUser[r.userName].score ||
-              (r.score === bestByUser[r.userName].score && r.timeSpent < bestByUser[r.userName].timeSpent)) {
+            (r.score === bestByUser[r.userName].score && r.timeSpent < bestByUser[r.userName].timeSpent)) {
             bestByUser[r.userName] = r;
           }
         });
@@ -192,28 +207,28 @@
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  <th style="text-align:center;">#</th>
-                  <th>Участник</th>
-                  <th>Группа</th>
-                  <th style="text-align:right;">Результат</th>
-                  <th style="text-align:right;">Время</th>
+                  <th style="text-align:center;">RANK</th>
+                  <th>AGENT</th>
+                  <th>UNIT</th>
+                  <th style="text-align:right;">RATING</th>
+                  <th style="text-align:right;">TIME</th>
                 </tr>
               </thead>
               <tbody>
                 ${sorted.map((r, i) => `
-                  <tr class="${r.userName === user.name ? 'highlight-row' : ''}">
-                    <td class="rank-cell rank-${i + 1}">${i < 3 ? ['&#129351;', '&#129352;', '&#129353;'][i] : i + 1}</td>
-                    <td class="name-cell">${Utils.escapeHtml(r.userName)}</td>
-                    <td style="color:var(--text-muted);">${Utils.escapeHtml(r.userGroup || '—')}</td>
-                    <td class="score-cell">${r.score}% <small style="color:var(--text-muted);">(${r.correctCount}/${r.totalQuestions})</small></td>
+                  <tr class="${r.userName === user.name ? 'highlight-row' : ''}" style="${r.userName === user.name ? 'background: var(--bg-secondary);' : ''}">
+                    <td class="rank-cell rank-${i + 1}">${i + 1}</td>
+                    <td class="name-cell" style="font-weight: 700;">${Utils.escapeHtml(r.userName)}</td>
+                    <td class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(r.userGroup || '—')}</td>
+                    <td class="score-cell">${r.score}% <small class="mono" style="color:var(--text-muted); font-size: 0.8em;">(${r.correctCount}/${r.totalQuestions})</small></td>
                     <td class="time-cell">${Utils.formatTime(r.timeSpent)}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>
-          <p style="color:var(--text-muted); font-size:0.85rem; margin-top:12px;">
-            Показан лучший результат каждого участника. Всего попыток: ${results.length}
+          <p class="mono" style="color:var(--text-muted); font-size:0.8rem; margin-top:12px; text-transform:uppercase;">
+            Displaying optimal performance records. Total attempts: ${results.length}
           </p>
         `;
       }
@@ -223,9 +238,9 @@
         if (allResults.length === 0) {
           return `
             <div class="empty-state">
-              <div class="empty-state-icon">&#127942;</div>
-              <p>Результатов пока нет. Пройдите тест, чтобы попасть в рейтинг!</p>
-              <a href="tests.html" class="btn btn-primary" style="margin-top:16px;">К тестам</a>
+              <div class="empty-state-icon">!</div>
+              <p>NO RECORDS FOUND.</p>
+              <a href="tests.html" class="btn" style="margin-top:16px;">VIEW MODULES</a>
             </div>
           `;
         }
@@ -267,22 +282,22 @@
             <table class="leaderboard-table">
               <thead>
                 <tr>
-                  <th style="text-align:center;">#</th>
-                  <th>Участник</th>
-                  <th>Группа</th>
-                  <th style="text-align:right;">Средний балл</th>
-                  <th style="text-align:right;">Тестов</th>
-                  <th style="text-align:right;">Общее время</th>
+                  <th style="text-align:center;">RANK</th>
+                  <th>AGENT</th>
+                  <th>UNIT</th>
+                  <th style="text-align:right;">AVG_RATING</th>
+                  <th style="text-align:right;">L_COUNT</th>
+                  <th style="text-align:right;">TOTAL_TIME</th>
                 </tr>
               </thead>
               <tbody>
                 ${sorted.map((s, i) => `
-                  <tr class="${s.name === user.name ? 'highlight-row' : ''}">
-                    <td class="rank-cell rank-${i + 1}">${i < 3 ? ['&#129351;', '&#129352;', '&#129353;'][i] : i + 1}</td>
-                    <td class="name-cell">${Utils.escapeHtml(s.name)}</td>
-                    <td style="color:var(--text-muted);">${Utils.escapeHtml(s.group || '—')}</td>
+                  <tr class="${s.name === user.name ? 'highlight-row' : ''}" style="${s.name === user.name ? 'background: var(--bg-secondary);' : ''}">
+                    <td class="rank-cell rank-${i + 1}">${i + 1}</td>
+                    <td class="name-cell" style="font-weight: 700;">${Utils.escapeHtml(s.name)}</td>
+                    <td class="mono" style="color:var(--text-muted); text-transform:uppercase;">${Utils.escapeHtml(s.group || '—')}</td>
                     <td class="score-cell">${s.avgScore}%</td>
-                    <td style="text-align:right;">${s.testsCompleted}</td>
+                    <td class="mono" style="text-align:right;">${s.testsCompleted}</td>
                     <td class="time-cell">${Utils.formatTime(s.totalTime)}</td>
                   </tr>
                 `).join('')}
@@ -294,4 +309,5 @@
     })();
   </script>
 </body>
+
 </html>
