@@ -29,6 +29,104 @@
       align-items: center;
       gap: 5px;
     }
+
+    /* Teacher Dashboard */
+    .teacher-dashboard {
+      background: white;
+      border-radius: var(--radius-md);
+      padding: 30px;
+      box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .teacher-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      color: var(--yellow);
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+    }
+
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .stats-table th {
+      padding: 12px 15px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: #888;
+      border-bottom: 2px solid #eee;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .stats-table td {
+      padding: 14px 15px;
+      border-bottom: 1px solid #f4f4f4;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .stats-table tr:hover {
+      background: #f9f9ff;
+    }
+
+    .progress-bar-bg {
+      background: #eee;
+      border-radius: 10px;
+      height: 10px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s ease;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .participate-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 15px;
+      padding: 12px 15px;
+      background: #f4f4f4;
+      border-radius: 10px;
+    }
+
+    .participate-toggle input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--blue);
+      cursor: pointer;
+    }
+
+    .participate-toggle label {
+      margin: 0;
+      text-transform: none;
+      font-size: 0.95rem;
+      color: #555;
+      cursor: pointer;
+    }
   </style>
 </head>
 
@@ -61,6 +159,7 @@
       let testStartTime = 0;
       let showingIntermediateResults = false;
       let joinLock = false;
+      let isObserver = false; // Teacher observer mode
 
       // Color/Shape mapping
       const optionConfigs = [
@@ -71,6 +170,10 @@
       ];
 
       if (roomParam) {
+        // Check if returning as observer
+        if (localStorage.getItem('battle_is_observer') === 'true' && localStorage.getItem('battle_room') === roomParam) {
+          isObserver = true;
+        }
         showJoinScreen(roomParam);
       } else {
         showCreateOrJoin();
@@ -78,6 +181,8 @@
 
       function showCreateOrJoin() {
         const tests = Storage.getTests();
+        const isAdmin = user && user.role === 'admin';
+
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; max-width:900px; padding-top:40px;">
             <h1 style="font-size:clamp(3rem, 6vw, 4.5rem); margin-bottom:10px; text-shadow:none; color:white; line-height:1;">BATTLE MODE</h1>
@@ -98,7 +203,13 @@
                     <input id="creatorName" class="form-control" placeholder="Prof. X">
                   </div>
                 ` : ''}
-                <button id="createBtn" class="btn btn-primary btn-block" style="font-size:1.2rem; padding:20px;">Create Room</button>
+                ${isAdmin ? `
+                  <div class="participate-toggle">
+                    <input type="checkbox" id="participateToggle">
+                    <label for="participateToggle">Participate in the game (play alongside students)</label>
+                  </div>
+                ` : ''}
+                <button id="createBtn" class="btn btn-primary btn-block" style="font-size:1.2rem; padding:20px; margin-top:20px;">Create Room</button>
               </div>
 
               <div class="card" style="border-top:12px solid var(--green); text-align:left;">
@@ -131,8 +242,24 @@
           const test = Storage.getTest(testId);
           const b = Storage.createBattle(testId, test.title, test.questions.length, test.timeLimit, name);
 
-          myPlayerId = Storage.joinBattle(b.id, name, user ? user.group : '');
-          localStorage.setItem('battle_player_id', myPlayerId);
+          // Check if admin wants to observe
+          const participateEl = document.getElementById('participateToggle');
+          const wantsToParticipate = participateEl ? participateEl.checked : true;
+
+          if (isAdmin && !wantsToParticipate) {
+            // Observer mode — don't join as player
+            isObserver = true;
+            myPlayerId = null;
+            localStorage.removeItem('battle_player_id');
+            localStorage.setItem('battle_is_observer', 'true');
+          } else {
+            // Join as player
+            isObserver = false;
+            myPlayerId = Storage.joinBattle(b.id, name, user ? user.group : '');
+            localStorage.setItem('battle_player_id', myPlayerId);
+            localStorage.setItem('battle_is_observer', 'false');
+          }
+
           localStorage.setItem('battle_room', b.id);
           localStorage.setItem('battle_is_creator', 'true');
 
@@ -151,6 +278,12 @@
       }
 
       function showJoinScreen(roomCode) {
+        // Observer returning
+        if (isObserver) {
+          showLobby(roomCode);
+          return;
+        }
+
         const savedRoom = localStorage.getItem('battle_room');
         const savedPlayerId = localStorage.getItem('battle_player_id');
 
@@ -169,6 +302,7 @@
         localStorage.setItem('battle_player_id', myPlayerId);
         localStorage.setItem('battle_room', roomCode);
         localStorage.setItem('battle_is_creator', 'false');
+        localStorage.setItem('battle_is_observer', 'false');
         showLobby(roomCode);
       }
 
@@ -181,15 +315,27 @@
           battle = data;
 
           if (data.status === 'countdown' && !showingIntermediateResults) {
-            showCountdown(roomCode);
+            if (isObserver) {
+              showTeacherCountdown(roomCode);
+            } else {
+              showCountdown(roomCode);
+            }
             return;
           }
           if (data.status === 'active' && !showingIntermediateResults) {
-            startBattleTest(roomCode);
+            if (isObserver) {
+              renderTeacherDashboard(roomCode);
+            } else {
+              startBattleTest(roomCode);
+            }
             return;
           }
           if (data.status === 'finished') {
-            showFinalResults(roomCode);
+            if (isObserver) {
+              showTeacherResults(roomCode);
+            } else {
+              showFinalResults(roomCode);
+            }
             return;
           }
 
@@ -202,6 +348,8 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:40px;">
+             ${isObserver ? `<div class="teacher-badge">👁️ OBSERVER MODE — You are watching</div>` : ''}
+             
              <div class="pin-card">
                <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">Game PIN</div>
                <div style="font-size:5rem; font-weight:900; letter-spacing:8px; line-height:1; font-family:var(--font-display);">${roomCode}</div>
@@ -240,6 +388,209 @@
           document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode));
         }
       }
+
+      // ——— TEACHER OBSERVER VIEWS ———
+
+      function showTeacherCountdown(roomCode) {
+        let count = 3;
+        const render = () => {
+          document.getElementById('app').innerHTML = `
+            <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <div class="teacher-badge" style="margin-bottom:30px;">👁️ OBSERVER MODE</div>
+              <div style="font-size:clamp(10rem, 30vw, 20rem); font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s; font-family:var(--font-display); line-height:1;">${count === 0 ? 'GO!' : count}</div>
+              <h2 style="color:white; margin-top:40px; font-size:clamp(1.5rem, 4vw, 3rem); text-align:center; max-width:800px;">${Utils.escapeHtml(battle.testTitle)}</h2>
+            </div>
+          `;
+        };
+        render();
+        const iv = setInterval(() => {
+          count--;
+          if (count < 0) { clearInterval(iv); return; }
+          render();
+        }, 1000);
+      }
+
+      function renderTeacherDashboard(roomCode) {
+        if (!battle) return;
+        const players = battle.players ? Object.values(battle.players) : [];
+        testData = testData || Storage.getTest(battle.testId);
+        if (!testData) return;
+
+        const totalQ = testData.questions.length;
+        const allFinished = players.length > 0 && players.every(p => p.finished);
+        const finishedCount = players.filter(p => p.finished).length;
+        const avgProgress = players.length > 0
+          ? Math.round(players.reduce((sum, p) => sum + (p.answeredCount || 0), 0) / players.length)
+          : 0;
+
+        document.getElementById('app').innerHTML = `
+          <div class="container fade-in" style="text-align:center; padding-top:30px; max-width:950px;">
+            <div class="teacher-badge">👁️ LIVE DASHBOARD — ${Utils.escapeHtml(battle.testTitle)}</div>
+
+            <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Players</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Finished</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${players.length}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Avg Progress</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${avgProgress}/${totalQ}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Questions</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${totalQ}</div>
+              </div>
+            </div>
+
+            <div class="teacher-dashboard">
+              <table class="stats-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Player</th>
+                    <th>Group</th>
+                    <th>Progress</th>
+                    <th style="text-align:center;">Correct</th>
+                    <th style="text-align:center;">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${players.sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0)).map((p, i) => {
+          const answered = p.answeredCount || 0;
+          const correct = p.correctCount || 0;
+          const pct = Math.round((answered / totalQ) * 100);
+          const isFinished = p.finished;
+          const barColor = isFinished ? 'var(--green)' : 'var(--blue)';
+          const statusColor = isFinished ? '#26890C' : '#D89E00';
+          const statusText = isFinished ? 'Done' : 'Playing...';
+
+          return `
+                    <tr>
+                      <td style="color:#ccc; font-weight:800;">${i + 1}</td>
+                      <td>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <div style="width:36px; height:36px; border-radius:50%; background:${isFinished ? 'var(--green)' : 'var(--blue)'}; color:white; display:grid; place-items:center; font-weight:900; font-size:0.9rem; flex-shrink:0;">${p.name.charAt(0).toUpperCase()}</div>
+                          <span style="font-weight:800;">${Utils.escapeHtml(p.name)}</span>
+                        </div>
+                      </td>
+                      <td style="color:#888;">${Utils.escapeHtml(p.group || '—')}</td>
+                      <td>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <div class="progress-bar-bg" style="flex:1;">
+                            <div class="progress-bar-fill" style="width:${pct}%; background:${barColor};"></div>
+                          </div>
+                          <span style="font-family:var(--font-display); font-size:0.85rem; color:#666; min-width:45px; text-align:right;">${answered}/${totalQ}</span>
+                        </div>
+                      </td>
+                      <td style="text-align:center; font-family:var(--font-display); font-weight:800; color:${correct > 0 ? 'var(--green)' : '#ccc'};">${correct}</td>
+                      <td style="text-align:center;">
+                        <span style="display:inline-flex; align-items:center; gap:4px; font-size:0.85rem; color:${statusColor}; font-weight:700;">
+                          <span class="status-dot" style="background:${statusColor}; ${isFinished ? '' : 'animation: pulse 1.5s infinite;'}"></span>
+                          ${statusText}
+                        </span>
+                      </td>
+                    </tr>
+                  `;
+        }).join('')}
+                </tbody>
+              </table>
+              ${players.length === 0 ? '<p style="color:#999; padding:30px; text-align:center;">Waiting for players to start answering...</p>' : ''}
+            </div>
+
+            ${allFinished ? `
+              <button id="finishBtn" class="btn btn-primary" style="margin-top:30px; font-size:1.5rem; padding:20px 60px;">Show Final Results</button>
+            ` : ''}
+          </div>
+        `;
+
+        if (allFinished) {
+          const btn = document.getElementById('finishBtn');
+          if (btn) btn.addEventListener('click', () => Storage.finishBattle(roomCode));
+        }
+      }
+
+      function showTeacherResults(roomCode) {
+        if (!battle || !battle.players) return;
+        testData = testData || Storage.getTest(battle.testId);
+        const players = Object.values(battle.players).sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0));
+        const totalQ = testData ? testData.questions.length : (battle.questionsCount || 0);
+
+        document.getElementById('app').innerHTML = `
+          <div class="container fade-in" style="text-align:center; padding-top:30px; max-width:950px;">
+            <div class="teacher-badge">📊 FINAL RESULTS — ${Utils.escapeHtml(battle.testTitle)}</div>
+
+            <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Participants</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Avg Score</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">
+                  ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.correctCount || 0), 0) / players.length * 100 / totalQ) : 0}%
+                </div>
+              </div>
+              <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Best Score</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">
+                  ${players.length > 0 ? Math.round((players[0].correctCount || 0) / totalQ * 100) : 0}%
+                </div>
+              </div>
+            </div>
+
+            <div class="teacher-dashboard">
+              <table class="stats-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Group</th>
+                    <th style="text-align:center;">Score</th>
+                    <th style="text-align:center;">Correct</th>
+                    <th style="text-align:right;">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${players.map((p, i) => {
+          const correct = p.correctCount || 0;
+          const scorePct = totalQ > 0 ? Math.round(correct / totalQ * 100) : 0;
+          const timeSpent = p.timeSpent || 0;
+          const rankColors = ['#D89E00', '#C0C0C0', '#CD7F32'];
+          const rankBg = i < 3 ? rankColors[i] : '#eee';
+          const rankColor = i < 3 ? 'white' : '#888';
+
+          return `
+                    <tr>
+                      <td>
+                        <span style="display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:${rankBg}; color:${rankColor}; font-weight:900; font-size:0.9rem;">${i + 1}</span>
+                      </td>
+                      <td style="font-weight:800;">${Utils.escapeHtml(p.name)}</td>
+                      <td style="color:#888;">${Utils.escapeHtml(p.group || '—')}</td>
+                      <td style="text-align:center;">
+                        <span style="font-weight:900; font-size:1.3rem; color:${scorePct >= 70 ? 'var(--green)' : scorePct >= 40 ? 'var(--yellow)' : 'var(--red)'};">${scorePct}%</span>
+                      </td>
+                      <td style="text-align:center; font-family:var(--font-display); font-weight:700; color:#555;">${correct}/${totalQ}</td>
+                      <td style="text-align:right; font-family:var(--font-display); color:#888;">${Utils.formatTime(timeSpent)}</td>
+                    </tr>
+                  `;
+        }).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <div style="margin-top:30px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
+              <a href="leaderboard.html?test=${battle.testId}" class="btn btn-primary" style="padding:15px 30px;">View Leaderboard</a>
+              <a href="tests.html" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.3); padding:15px 30px;">Back to Menu</a>
+            </div>
+          </div>
+        `;
+      }
+
+      // ——— STUDENT VIEWS (unchanged) ———
 
       function showCountdown(roomCode) {
         let count = 3;
@@ -392,7 +743,6 @@
                <div style="font-size:6rem; font-weight:900; color:var(--text-main); font-family:var(--font-display); line-height:1; margin-top:10px;">${correctCount}<span style="font-size:3rem; color:#ccc;">/${testData.questions.length}</span></div>
              </div>
              <p style="color:rgba(255,255,255,0.8); font-size:1.5rem; margin-top:40px; font-weight:700;">Waiting for others...</p>
-             <div class="battle-waiting-pulse" style="margin:20px auto; background:white; width:30px; height:30px;"></div>
            </div>
          `;
 

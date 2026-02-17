@@ -104,20 +104,71 @@
   <script>
     Storage.initFirebase();
     (function () {
-      const user = Utils.requireAuth();
-      if (!user || user.role !== 'admin') {
-        window.location.href = 'index.html';
-        return;
+      // Check if already admin
+      let user = Storage.getUser();
+
+      if (user && user.role === 'admin') {
+        // Already logged in as admin, proceed
+        initAdmin(user);
+      } else {
+        // Show admin login form
+        showAdminLogin();
       }
 
-      let currentTab = 'tests'; // 'tests' | 'editor' | 'results' | 'settings'
-      let editingTest = null;
+      function showAdminLogin() {
+        document.getElementById('app').innerHTML = `
+          <div class="fade-in" style="text-align:center; max-width:400px; width:90%; margin:0 auto;">
+            <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin-bottom:10px; color:white; text-shadow:0 4px 0 rgba(0,0,0,0.2);">GAME MASTER</h1>
+            <p style="color:rgba(255,255,255,0.7); margin-bottom:30px; font-weight:700;">Teacher Console Access</p>
+            
+            <div class="card" style="border-top:12px solid var(--yellow); padding:30px; text-align:left;">
+              <form id="adminLoginForm">
+                <div class="form-group">
+                  <label>Your Name</label>
+                  <input type="text" id="adminName" class="form-control" placeholder="Teacher name" required
+                    value="${user ? Utils.escapeHtml(user.name) : ''}" style="text-align:center; font-weight:700;">
+                </div>
+                <div class="form-group">
+                  <label>Admin Password</label>
+                  <input type="password" id="adminPassword" class="form-control" placeholder="Enter password" required
+                    style="text-align:center; font-weight:700; letter-spacing:3px;">
+                </div>
+                <button type="submit" class="btn btn-block" style="background:var(--yellow); color:#333; font-size:1.2rem; padding:18px; border-bottom:5px solid var(--yellow-shadow);">
+                  Enter Console
+                </button>
+              </form>
+              <div id="loginError" style="color:var(--red); font-weight:700; text-align:center; margin-top:15px; display:none;">
+                Wrong password!
+              </div>
+            </div>
 
-      render();
+            <a href="index.html" class="btn" style="background:rgba(255,255,255,0.1); border:none; color:rgba(255,255,255,0.6); margin-top:20px; font-size:0.9rem;">Back to Login</a>
+          </div>
+        `;
 
-      function render() {
-        // Custom Header for Admin
-        const headerHtml = `
+        document.getElementById('adminLoginForm').addEventListener('submit', function (e) {
+          e.preventDefault();
+          const name = document.getElementById('adminName').value.trim();
+          const pass = document.getElementById('adminPassword').value.trim();
+          const correctPass = localStorage.getItem('ct_admin_password') || 'admin';
+
+          if (pass === correctPass) {
+            user = { name, role: 'admin' };
+            Storage.setUser(user);
+            initAdmin(user);
+          } else {
+            const errEl = document.getElementById('loginError');
+            errEl.style.display = 'block';
+            errEl.style.animation = 'popIn 0.3s';
+          }
+        });
+      }
+
+      function initAdmin(user) {
+
+        function render() {
+          // Custom Header for Admin
+          const headerHtml = `
           <div class="admin-header">
             <div style="font-weight: 900; font-size: 1.4rem; text-transform: uppercase; letter-spacing:1px;">
               TEST ARENA <span style="opacity:0.5; margin:0 5px;">//</span> <span style="color:var(--yellow);">GAME MASTER</span>
@@ -129,7 +180,7 @@
           </div>
         `;
 
-        document.getElementById('app').innerHTML = `
+          document.getElementById('app').innerHTML = `
           ${headerHtml}
           <div class="fade-in">
             <nav class="tab-nav">
@@ -145,26 +196,26 @@
           </div>
         `;
 
-        switch (currentTab) {
-          case 'tests': renderTestsList(); break;
-          case 'editor': renderEditor(); break;
-          case 'results': renderResults(); break;
-          case 'settings': renderSettings(); break;
+          switch (currentTab) {
+            case 'tests': renderTestsList(); break;
+            case 'editor': renderEditor(); break;
+            case 'results': renderResults(); break;
+            case 'settings': renderSettings(); break;
+          }
         }
-      }
 
-      window.switchTab = function (tab) {
-        currentTab = tab;
-        if (tab === 'editor' && !editingTest) {
-          editingTest = createEmptyTest();
-        }
-        render();
-      };
+        window.switchTab = function (tab) {
+          currentTab = tab;
+          if (tab === 'editor' && !editingTest) {
+            editingTest = createEmptyTest();
+          }
+          render();
+        };
 
-      // ——— Tests List ———
-      function renderTestsList() {
-        const tests = Storage.getTests();
-        document.getElementById('tabContent').innerHTML = `
+        // ——— Tests List ———
+        function renderTestsList() {
+          const tests = Storage.getTests();
+          document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
             <p style="color:#666; font-weight:700;">Total Challenges: ${tests.length}</p>
             <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">+ New Challenge</button>
@@ -178,8 +229,8 @@
           ` : `
             <div style="display:grid; gap:20px;">
               ${tests.map(test => {
-          const results = Storage.getResultsForTest(test.id);
-          return `
+            const results = Storage.getResultsForTest(test.id);
+            return `
                   <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; padding:20px;">
                     <div>
                       <h3 style="margin:0 0 5px 0; font-size:1.3rem; color:#333;">${Utils.escapeHtml(test.title)}</h3>
@@ -193,57 +244,57 @@
                     </div>
                   </div>
                 `;
-        }).join('')}
+          }).join('')}
             </div>
           `}
         `;
-      }
+        }
 
-      window.createNewTest = function () {
-        editingTest = createEmptyTest();
-        currentTab = 'editor';
-        render();
-      };
-
-      window.editTest = function (id) {
-        editingTest = JSON.parse(JSON.stringify(Storage.getTest(id)));
-        currentTab = 'editor';
-        render();
-      };
-
-      window.confirmDeleteTest = function (id, title) {
-        showConfirmModal(`Delete "${title}"?`, 'This cannot be undone. All results for this challenge will also be lost.', () => {
-          Storage.deleteTest(id);
-          Utils.showNotification('Challenge deleted!', 'success');
+        window.createNewTest = function () {
+          editingTest = createEmptyTest();
+          currentTab = 'editor';
           render();
-        });
-      };
-
-      // ——— Editor ———
-      function createEmptyTest() {
-        return {
-          id: Storage.generateId(),
-          title: '',
-          description: '',
-          timeLimit: 300,
-          createdAt: Date.now(),
-          questions: [createEmptyQuestion()],
         };
-      }
 
-      function createEmptyQuestion() {
-        return {
-          id: Storage.generateId(),
-          text: '',
-          options: ['', '', '', ''],
-          correct: 0,
+        window.editTest = function (id) {
+          editingTest = JSON.parse(JSON.stringify(Storage.getTest(id)));
+          currentTab = 'editor';
+          render();
         };
-      }
 
-      function renderEditor() {
-        if (!editingTest) return;
-        const t = editingTest;
-        document.getElementById('tabContent').innerHTML = `
+        window.confirmDeleteTest = function (id, title) {
+          showConfirmModal(`Delete "${title}"?`, 'This cannot be undone. All results for this challenge will also be lost.', () => {
+            Storage.deleteTest(id);
+            Utils.showNotification('Challenge deleted!', 'success');
+            render();
+          });
+        };
+
+        // ——— Editor ———
+        function createEmptyTest() {
+          return {
+            id: Storage.generateId(),
+            title: '',
+            description: '',
+            timeLimit: 300,
+            createdAt: Date.now(),
+            questions: [createEmptyQuestion()],
+          };
+        }
+
+        function createEmptyQuestion() {
+          return {
+            id: Storage.generateId(),
+            text: '',
+            options: ['', '', '', ''],
+            correct: 0,
+          };
+        }
+
+        function renderEditor() {
+          if (!editingTest) return;
+          const t = editingTest;
+          document.getElementById('tabContent').innerHTML = `
           <div class="editor-section">
             <h2 style="margin-bottom:20px; color:#333;">Challenge Settings</h2>
             <div class="form-group">
@@ -276,13 +327,13 @@
           </div>
         `;
 
-        document.getElementById('testTitle').addEventListener('input', (e) => { editingTest.title = e.target.value; });
-        document.getElementById('testDesc').addEventListener('input', (e) => { editingTest.description = e.target.value; });
-        document.getElementById('testTime').addEventListener('input', (e) => { editingTest.timeLimit = parseInt(e.target.value) || 300; });
-      }
+          document.getElementById('testTitle').addEventListener('input', (e) => { editingTest.title = e.target.value; });
+          document.getElementById('testDesc').addEventListener('input', (e) => { editingTest.description = e.target.value; });
+          document.getElementById('testTime').addEventListener('input', (e) => { editingTest.timeLimit = parseInt(e.target.value) || 300; });
+        }
 
-      function renderQuestionEditor(q, qi) {
-        return `
+        function renderQuestionEditor(q, qi) {
+          return `
           <div class="q-card" data-qi="${qi}">
             <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
               <span style="font-weight:800; color:#888;">Question ${qi + 1}</span>
@@ -306,58 +357,58 @@
             </div>
           </div>
         `;
-      }
-
-      document.addEventListener('input', (e) => {
-        if (e.target.classList.contains('q-text')) {
-          const qi = parseInt(e.target.dataset.qi);
-          if (editingTest && editingTest.questions[qi]) {
-            editingTest.questions[qi].text = e.target.value;
-          }
         }
-        if (e.target.classList.contains('q-option')) {
-          const qi = parseInt(e.target.dataset.qi);
-          const oi = parseInt(e.target.dataset.oi);
-          if (editingTest && editingTest.questions[qi]) {
-            editingTest.questions[qi].options[oi] = e.target.value;
+
+        document.addEventListener('input', (e) => {
+          if (e.target.classList.contains('q-text')) {
+            const qi = parseInt(e.target.dataset.qi);
+            if (editingTest && editingTest.questions[qi]) {
+              editingTest.questions[qi].text = e.target.value;
+            }
           }
-        }
-      });
+          if (e.target.classList.contains('q-option')) {
+            const qi = parseInt(e.target.dataset.qi);
+            const oi = parseInt(e.target.dataset.oi);
+            if (editingTest && editingTest.questions[qi]) {
+              editingTest.questions[qi].options[oi] = e.target.value;
+            }
+          }
+        });
 
-      window.setCorrect = function (qi, oi) {
-        if (editingTest && editingTest.questions[qi]) editingTest.questions[qi].correct = oi;
-        renderEditor();
-      };
-      window.addQuestion = function () {
-        editingTest.questions.push(createEmptyQuestion());
-        renderEditor();
-        setTimeout(() => {
-          const list = document.getElementById('questionsList');
-          if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-      };
-      window.removeQuestion = function (qi) {
-        editingTest.questions.splice(qi, 1);
-        renderEditor();
-      };
-      window.saveTest = function () {
-        const t = editingTest;
-        if (!t.title.trim()) { Utils.showNotification('Title is required!', 'error'); return; }
-        if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('Some questions are empty!', 'error'); return; }
-        if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('Some options are empty!', 'error'); return; }
-        Storage.saveTest(t);
-        Utils.showNotification('Challenge Saved Successfully!', 'success');
-        editingTest = null;
-        currentTab = 'tests';
-        render();
-      };
+        window.setCorrect = function (qi, oi) {
+          if (editingTest && editingTest.questions[qi]) editingTest.questions[qi].correct = oi;
+          renderEditor();
+        };
+        window.addQuestion = function () {
+          editingTest.questions.push(createEmptyQuestion());
+          renderEditor();
+          setTimeout(() => {
+            const list = document.getElementById('questionsList');
+            if (list) list.lastElementChild.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        };
+        window.removeQuestion = function (qi) {
+          editingTest.questions.splice(qi, 1);
+          renderEditor();
+        };
+        window.saveTest = function () {
+          const t = editingTest;
+          if (!t.title.trim()) { Utils.showNotification('Title is required!', 'error'); return; }
+          if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('Some questions are empty!', 'error'); return; }
+          if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('Some options are empty!', 'error'); return; }
+          Storage.saveTest(t);
+          Utils.showNotification('Challenge Saved Successfully!', 'success');
+          editingTest = null;
+          currentTab = 'tests';
+          render();
+        };
 
-      // ——— Results ———
-      function renderResults() {
-        const tests = Storage.getTests();
-        const allResults = Storage.getResults();
+        // ——— Results ———
+        function renderResults() {
+          const tests = Storage.getTests();
+          const allResults = Storage.getResults();
 
-        document.getElementById('tabContent').innerHTML = `
+          document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
             <p style="color:#666; font-weight:700;">Total Records: ${allResults.length}</p>
             ${allResults.length > 0 ? `
@@ -366,9 +417,9 @@
           </div>
 
           ${tests.map(test => {
-          const results = Storage.getResultsForTest(test.id);
-          if (results.length === 0) return '';
-          return `
+            const results = Storage.getResultsForTest(test.id);
+            if (results.length === 0) return '';
+            return `
               <div class="card" style="margin-bottom:30px; padding:0; overflow:hidden;">
                 <div class="card-header" style="background:#f9f9f9; padding:15px 20px; font-weight:800; color:#444; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
                   <span>${Utils.escapeHtml(test.title)}</span>
@@ -400,22 +451,22 @@
                 </table>
               </div>
             `;
-        }).join('') || '<div class="empty-state card" style="text-align:center; padding:40px;"><p>No results recorded yet.</p></div>'}
+          }).join('') || '<div class="empty-state card" style="text-align:center; padding:40px;"><p>No results recorded yet.</p></div>'}
         `;
-      }
+        }
 
-      window.confirmClearResults = function () {
-        showConfirmModal('Clear All History?', 'This will permanently delete all student results. Challenges will remain.', () => {
-          Storage.clearAllResults();
-          Utils.showNotification('History cleared!', 'success');
-          render();
-        });
-      };
+        window.confirmClearResults = function () {
+          showConfirmModal('Clear All History?', 'This will permanently delete all student results. Challenges will remain.', () => {
+            Storage.clearAllResults();
+            Utils.showNotification('History cleared!', 'success');
+            render();
+          });
+        };
 
-      // ——— Settings ———
-      function renderSettings() {
-        const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
-        document.getElementById('tabContent').innerHTML = `
+        // ——— Settings ———
+        function renderSettings() {
+          const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
+          document.getElementById('tabContent').innerHTML = `
           <div class="card" style="max-width:500px; margin:0 auto; padding:30px;">
             <h2 style="margin-bottom:25px; color:#333;">System Configuration</h2>
             <div class="form-group">
@@ -431,46 +482,47 @@
             </div>
           </div>
         `;
-      }
+        }
 
-      window.saveSettings = function () {
-        const pass = document.getElementById('adminPass').value.trim();
-        if (!pass) { Utils.showNotification('Password required!', 'error'); return; }
-        localStorage.setItem('ct_admin_password', pass);
-        Utils.showNotification('Settings saved!', 'success');
-      };
-
-      window.confirmResetAll = function () {
-        showConfirmModal('Factory Reset?', 'WARNING: This will delete ALL challenges and results. Are you sure?', () => {
-          Storage.resetAllData();
-          Utils.showNotification('System reset successfully', 'success');
-          render();
-        });
-      };
-
-      function showConfirmModal(title, text, onConfirm) {
-        const modal = document.getElementById('confirmModal');
-        document.getElementById('modalTitle').textContent = title;
-        document.getElementById('modalText').textContent = text;
-        modal.classList.add('active');
-
-        const confirmBtn = document.getElementById('modalConfirm');
-        const cancelBtn = document.getElementById('modalCancel');
-
-        // Clone to remove old listeners
-        const newConfirm = confirmBtn.cloneNode(true);
-        const newCancel = cancelBtn.cloneNode(true);
-        confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
-        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
-
-        const cleanup = () => {
-          modal.classList.remove('active');
+        window.saveSettings = function () {
+          const pass = document.getElementById('adminPass').value.trim();
+          if (!pass) { Utils.showNotification('Password required!', 'error'); return; }
+          localStorage.setItem('ct_admin_password', pass);
+          Utils.showNotification('Settings saved!', 'success');
         };
 
-        newConfirm.addEventListener('click', () => { cleanup(); onConfirm(); });
-        newCancel.addEventListener('click', cleanup);
-        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
-      }
+        window.confirmResetAll = function () {
+          showConfirmModal('Factory Reset?', 'WARNING: This will delete ALL challenges and results. Are you sure?', () => {
+            Storage.resetAllData();
+            Utils.showNotification('System reset successfully', 'success');
+            render();
+          });
+        };
+
+        function showConfirmModal(title, text, onConfirm) {
+          const modal = document.getElementById('confirmModal');
+          document.getElementById('modalTitle').textContent = title;
+          document.getElementById('modalText').textContent = text;
+          modal.classList.add('active');
+
+          const confirmBtn = document.getElementById('modalConfirm');
+          const cancelBtn = document.getElementById('modalCancel');
+
+          // Clone to remove old listeners
+          const newConfirm = confirmBtn.cloneNode(true);
+          const newCancel = cancelBtn.cloneNode(true);
+          confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+          cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+
+          const cleanup = () => {
+            modal.classList.remove('active');
+          };
+
+          newConfirm.addEventListener('click', () => { cleanup(); onConfirm(); });
+          newCancel.addEventListener('click', cleanup);
+          modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
+        }
+      } // end initAdmin
     })();
   </script>
 </body>
