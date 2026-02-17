@@ -36,6 +36,7 @@
       let questionStartTimes = [];
       let showingIntermediateResults = false;
       let intermediateShownAt = new Set(); // track which checkpoints we've shown
+      let joinLock = false; // prevent double-joining
 
       if (!Storage.isOnline()) {
         document.getElementById('app').innerHTML = `
@@ -112,7 +113,9 @@
           </div>
         `;
 
-        document.getElementById('createBtn').addEventListener('click', () => {
+        document.getElementById('createBtn').addEventListener('click', function() {
+          this.disabled = true;
+          this.textContent = 'Создание...';
           let name, group;
           if (user) {
             name = user.name;
@@ -120,15 +123,16 @@
           } else {
             name = document.getElementById('creatorName').value.trim();
             group = document.getElementById('creatorGroup') ? document.getElementById('creatorGroup').value.trim() : '';
-            if (!name) { Utils.showNotification('Введите имя!', 'error'); return; }
+            if (!name) { Utils.showNotification('Введите имя!', 'error'); this.disabled = false; this.textContent = 'Создать комнату'; return; }
             Storage.setUser({ name, group, role: 'student' });
           }
           const testId = document.getElementById('testSelect').value;
           const test = Storage.getTest(testId);
-          if (!test) { Utils.showNotification('Тест не найден!', 'error'); return; }
+          if (!test) { Utils.showNotification('Тест не найден!', 'error'); this.disabled = false; this.textContent = 'Создать комнату'; return; }
 
           const b = Storage.createBattle(testId, test.title, test.questions.length, test.timeLimit, name);
           myPlayerId = Storage.joinBattle(b.id, name, group);
+          joinLock = true;
           localStorage.setItem('battle_player_id', myPlayerId);
           localStorage.setItem('battle_room', b.id);
           localStorage.setItem('battle_is_creator', 'true');
@@ -138,9 +142,11 @@
           showLobby(b.id);
         });
 
-        document.getElementById('joinBtn').addEventListener('click', () => {
+        document.getElementById('joinBtn').addEventListener('click', function() {
           const code = document.getElementById('roomCode').value.trim().toUpperCase();
           if (!code || code.length < 4) { Utils.showNotification('Введите код комнаты!', 'error'); return; }
+          this.disabled = true;
+          this.textContent = 'Подключение...';
           showJoinScreen(code);
         });
       }
@@ -180,10 +186,12 @@
               </div>
             </div>
           `;
-          document.getElementById('enterBtn').addEventListener('click', () => {
+          document.getElementById('enterBtn').addEventListener('click', function() {
             const n = document.getElementById('playerName').value.trim();
             const g = document.getElementById('playerGroup').value.trim();
             if (!n) { Utils.showNotification('Введите имя!', 'error'); return; }
+            this.disabled = true;
+            this.textContent = 'Подключение...';
             Storage.setUser({ name: n, group: g, role: 'student' });
             doJoin(roomCode, n, g);
           });
@@ -193,9 +201,17 @@
       }
 
       function doJoin(roomCode, name, group) {
-        // Check if room exists first
-        Storage.onBattleChange(roomCode, (data) => {
+        // Prevent double-join
+        if (joinLock || myPlayerId) {
+          if (myPlayerId) showLobby(roomCode);
+          return;
+        }
+        joinLock = true;
+
+        // One-time check if room exists (NOT a persistent listener)
+        Storage.getBattleOnce(roomCode, (data) => {
           if (!data) {
+            joinLock = false;
             document.getElementById('app').innerHTML = `
               <div class="hero fade-in">
                 <h1 class="battle-title-glow">Battle Mode</h1>
@@ -207,30 +223,35 @@
             `;
             return;
           }
-          // Room found, join it (only once)
-          if (!myPlayerId) {
-            if (data.status !== 'waiting') {
-              document.getElementById('app').innerHTML = `
-                <div class="hero fade-in">
-                  <h1 class="battle-title-glow">Battle Mode</h1>
-                  <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
-                    <p style="color:var(--warning);font-size:1.1rem;">Эта игра уже началась или завершена.</p>
-                    <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Создать новую комнату</a>
-                  </div>
+
+          if (data.status !== 'waiting') {
+            joinLock = false;
+            document.getElementById('app').innerHTML = `
+              <div class="hero fade-in">
+                <h1 class="battle-title-glow">Battle Mode</h1>
+                <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
+                  <p style="color:var(--warning);font-size:1.1rem;">Эта игра уже началась или завершена.</p>
+                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Создать новую комнату</a>
                 </div>
-              `;
-              return;
-            }
-            myPlayerId = Storage.joinBattle(roomCode, name, group);
-            localStorage.setItem('battle_player_id', myPlayerId);
-            localStorage.setItem('battle_room', roomCode);
-            localStorage.setItem('battle_is_creator', 'false');
+              </div>
+            `;
+            return;
           }
+
+          // Double-check myPlayerId hasn't been set while waiting for Firebase
+          if (myPlayerId) {
+            joinLock = false;
+            showLobby(roomCode);
+            return;
+          }
+
+          myPlayerId = Storage.joinBattle(roomCode, name, group);
+          localStorage.setItem('battle_player_id', myPlayerId);
+          localStorage.setItem('battle_room', roomCode);
+          localStorage.setItem('battle_is_creator', 'false');
+
+          showLobby(roomCode);
         });
-        // Small delay to let Firebase check complete, then show lobby
-        setTimeout(() => {
-          if (myPlayerId) showLobby(roomCode);
-        }, 1500);
       }
 
       function showLobby(roomCode) {

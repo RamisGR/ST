@@ -353,6 +353,13 @@ const Storage = (() => {
     if (ref) ref.off();
   }
 
+  function getBattleOnce(roomCode, callback) {
+    if (!firebaseReady) { callback(null); return; }
+    db.ref('battles/' + roomCode).once('value', (snapshot) => {
+      callback(snapshot.val());
+    });
+  }
+
   function getBattleRef(roomCode) {
     if (!firebaseReady) return null;
     return db.ref('battles/' + roomCode);
@@ -378,7 +385,7 @@ const Storage = (() => {
     // Battle
     createBattle, joinBattle, updateBattlePlayer,
     startBattle, finishBattle,
-    onBattleChange, offBattleChange, getBattleRef,
+    onBattleChange, offBattleChange, getBattleOnce, getBattleRef,
     generateRoomCode,
   };
 })();
