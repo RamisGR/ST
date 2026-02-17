@@ -60,6 +60,7 @@
                         <button onclick="startTest('${test.id}')" class="btn btn-sm ${completed ? 'btn-outline' : 'btn-primary'}">
                           ${completed ? 'Пройти снова' : 'Начать тест'}
                         </button>
+                        <a href="battle.html" onclick="event.preventDefault();startBattle('${test.id}')" class="btn btn-sm btn-accent">Battle</a>
                         <a href="leaderboard.html?test=${test.id}" class="btn btn-sm btn-outline">Рейтинг</a>
                       </div>
                     </div>
@@ -73,6 +74,10 @@
 
       window.startTest = function(testId) {
         window.location.href = `test.html?id=${testId}`;
+      };
+
+      window.startBattle = function(testId) {
+        window.location.href = `battle.html`;
       };
     })();
   </script>

@@ -63,6 +63,7 @@ const Utils = (() => {
         <nav class="header-nav">
           ${user ? `<span class="header-user">${escapeHtml(user.name)}${user.group ? ' (' + escapeHtml(user.group) + ')' : ''}</span>` : ''}
           <a href="tests.html" class="btn btn-sm ${activePage === 'tests' ? 'btn-primary' : 'btn-outline'}">Тесты</a>
+          <a href="battle.html" class="btn btn-sm ${activePage === 'battle' ? 'btn-accent' : 'btn-outline'}">Battle</a>
           <a href="leaderboard.html" class="btn btn-sm ${activePage === 'leaderboard' ? 'btn-primary' : 'btn-outline'}">Рейтинг</a>
           ${isAdmin ? `<a href="admin.html" class="btn btn-sm ${activePage === 'admin' ? 'btn-accent' : 'btn-outline'}">Админ</a>` : ''}
           ${user ? `<button onclick="App.logout()" class="btn btn-sm btn-outline">Выйти</button>` : ''}

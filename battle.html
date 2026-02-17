@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battle — TestArena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/sample-tests.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    Storage.initFirebase();
+    (function() {
+      const user = Storage.getUser();
+      const roomParam = Utils.getQueryParam('room');
+
+      // State
+      let battle = null;
+      let myPlayerId = null;
+      let battleRef = null;
+      let currentQuestion = 0;
+      let answers = [];
+      let testData = null;
+      let timerInterval = null;
+      let timeLeft = 0;
+      let testStartTime = 0;
+      let questionStartTimes = [];
+      let showingIntermediateResults = false;
+      let intermediateShownAt = new Set(); // track which checkpoints we've shown
+
+      if (!Storage.isOnline()) {
+        document.getElementById('app').innerHTML = `
+          <div class="hero fade-in">
+            <h1>TestArena Battle</h1>
+            <div class="card" style="max-width:500px;margin:0 auto;text-align:center;">
+              <p style="color:var(--danger);font-size:1.1rem;">Соревновательный режим требует подключения к Firebase.</p>
+              <p style="color:var(--text-muted);margin-top:12px;">Убедитесь, что Firebase настроен и есть интернет-соединение.</p>
+              <a href="tests.html" class="btn btn-primary" style="margin-top:20px;">Назад к тестам</a>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // If we have a room code, go directly to join/lobby
+      if (roomParam) {
+        showJoinScreen(roomParam);
+      } else {
+        showCreateOrJoin();
+      }
+
+      // ============ SCREENS ============
+
+      function showCreateOrJoin() {
+        const tests = Storage.getTests();
+        document.getElementById('app').innerHTML = `
+          ${user ? Utils.renderHeader(user, 'battle') : ''}
+          <div class="container fade-in" style="max-width:600px;">
+            <div style="text-align:center;margin:30px 0 20px;">
+              <h1 class="battle-title-glow">Battle Mode</h1>
+              <p style="color:var(--text-muted);">Соревнуйтесь с друзьями в реальном времени!</p>
+            </div>
+
+            <div class="card" style="margin-bottom:20px;">
+              <div class="card-header">Создать комнату</div>
+              ${!user ? `
+                <div class="form-group">
+                  <label for="creatorName">Ваше имя</label>
+                  <input type="text" id="creatorName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                </div>
+                <div class="form-group">
+                  <label for="creatorGroup">Группа (необязательно)</label>
+                  <input type="text" id="creatorGroup" class="form-control" placeholder="10-А" maxlength="30">
+                </div>
+              ` : ''}
+              <div class="form-group">
+                <label for="testSelect">Выберите тест</label>
+                <select id="testSelect" class="form-control">
+                  ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)} (${t.questions.length} вопр.)</option>`).join('')}
+                </select>
+              </div>
+              <button id="createBtn" class="btn btn-accent btn-block btn-lg">Создать комнату</button>
+            </div>
+
+            <div class="card">
+              <div class="card-header">Присоединиться</div>
+              ${!user ? `
+                <div class="form-group">
+                  <label for="joinName">Ваше имя</label>
+                  <input type="text" id="joinName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                </div>
+                <div class="form-group">
+                  <label for="joinGroup">Группа (необязательно)</label>
+                  <input type="text" id="joinGroup" class="form-control" placeholder="10-А" maxlength="30">
+                </div>
+              ` : ''}
+              <div class="form-group">
+                <label for="roomCode">Код комнаты</label>
+                <input type="text" id="roomCode" class="form-control" placeholder="ABCDEF" maxlength="6" style="text-transform:uppercase;font-size:1.3rem;text-align:center;letter-spacing:4px;font-weight:700;">
+              </div>
+              <button id="joinBtn" class="btn btn-primary btn-block btn-lg">Присоединиться</button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('createBtn').addEventListener('click', () => {
+          let name, group;
+          if (user) {
+            name = user.name;
+            group = user.group;
+          } else {
+            name = document.getElementById('creatorName').value.trim();
+            group = document.getElementById('creatorGroup') ? document.getElementById('creatorGroup').value.trim() : '';
+            if (!name) { Utils.showNotification('Введите имя!', 'error'); return; }
+            Storage.setUser({ name, group, role: 'student' });
+          }
+          const testId = document.getElementById('testSelect').value;
+          const test = Storage.getTest(testId);
+          if (!test) { Utils.showNotification('Тест не найден!', 'error'); return; }
+
+          const b = Storage.createBattle(testId, test.title, test.questions.length, test.timeLimit, name);
+          myPlayerId = Storage.joinBattle(b.id, name, group);
+          localStorage.setItem('battle_player_id', myPlayerId);
+          localStorage.setItem('battle_room', b.id);
+          localStorage.setItem('battle_is_creator', 'true');
+
+          // Update URL without reload
+          history.replaceState(null, '', 'battle.html?room=' + b.id);
+          showLobby(b.id);
+        });
+
+        document.getElementById('joinBtn').addEventListener('click', () => {
+          const code = document.getElementById('roomCode').value.trim().toUpperCase();
+          if (!code || code.length < 4) { Utils.showNotification('Введите код комнаты!', 'error'); return; }
+          showJoinScreen(code);
+        });
+      }
+
+      function showJoinScreen(roomCode) {
+        // Check if we're already in this room
+        const savedRoom = localStorage.getItem('battle_room');
+        const savedPlayerId = localStorage.getItem('battle_player_id');
+        if (savedRoom === roomCode && savedPlayerId) {
+          myPlayerId = savedPlayerId;
+          showLobby(roomCode);
+          return;
+        }
+
+        // Need to join
+        let name, group;
+        if (user) {
+          name = user.name;
+          group = user.group || '';
+        } else {
+          // Show name input
+          document.getElementById('app').innerHTML = `
+            <div class="hero fade-in">
+              <h1 class="battle-title-glow">Battle Mode</h1>
+              <p style="color:var(--text-muted);">Комната: <strong style="color:var(--accent);font-size:1.3rem;letter-spacing:3px;">${Utils.escapeHtml(roomCode)}</strong></p>
+              <div class="card" style="max-width:420px;margin:20px auto 0;">
+                <div class="card-header">Представьтесь</div>
+                <div class="form-group">
+                  <label for="playerName">Ваше имя</label>
+                  <input type="text" id="playerName" class="form-control" placeholder="Введите имя" required maxlength="50">
+                </div>
+                <div class="form-group">
+                  <label for="playerGroup">Группа (необязательно)</label>
+                  <input type="text" id="playerGroup" class="form-control" placeholder="10-А" maxlength="30">
+                </div>
+                <button id="enterBtn" class="btn btn-primary btn-block btn-lg">Войти в комнату</button>
+              </div>
+            </div>
+          `;
+          document.getElementById('enterBtn').addEventListener('click', () => {
+            const n = document.getElementById('playerName').value.trim();
+            const g = document.getElementById('playerGroup').value.trim();
+            if (!n) { Utils.showNotification('Введите имя!', 'error'); return; }
+            Storage.setUser({ name: n, group: g, role: 'student' });
+            doJoin(roomCode, n, g);
+          });
+          return;
+        }
+        doJoin(roomCode, name, group);
+      }
+
+      function doJoin(roomCode, name, group) {
+        // Check if room exists first
+        Storage.onBattleChange(roomCode, (data) => {
+          if (!data) {
+            document.getElementById('app').innerHTML = `
+              <div class="hero fade-in">
+                <h1 class="battle-title-glow">Battle Mode</h1>
+                <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
+                  <p style="color:var(--danger);font-size:1.1rem;">Комната <strong>${Utils.escapeHtml(roomCode)}</strong> не найдена.</p>
+                  <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Назад</a>
+                </div>
+              </div>
+            `;
+            return;
+          }
+          // Room found, join it (only once)
+          if (!myPlayerId) {
+            if (data.status !== 'waiting') {
+              document.getElementById('app').innerHTML = `
+                <div class="hero fade-in">
+                  <h1 class="battle-title-glow">Battle Mode</h1>
+                  <div class="card" style="max-width:500px;margin:20px auto 0;text-align:center;">
+                    <p style="color:var(--warning);font-size:1.1rem;">Эта игра уже началась или завершена.</p>
+                    <a href="battle.html" class="btn btn-primary" style="margin-top:20px;">Создать новую комнату</a>
+                  </div>
+                </div>
+              `;
+              return;
+            }
+            myPlayerId = Storage.joinBattle(roomCode, name, group);
+            localStorage.setItem('battle_player_id', myPlayerId);
+            localStorage.setItem('battle_room', roomCode);
+            localStorage.setItem('battle_is_creator', 'false');
+          }
+        });
+        // Small delay to let Firebase check complete, then show lobby
+        setTimeout(() => {
+          if (myPlayerId) showLobby(roomCode);
+        }, 1500);
+      }
+
+      function showLobby(roomCode) {
+        const isCreator = localStorage.getItem('battle_is_creator') === 'true';
+
+        // Listen to battle changes
+        if (battleRef) Storage.offBattleChange(battleRef);
+        battleRef = Storage.onBattleChange(roomCode, (data) => {
+          if (!data) return;
+          battle = data;
+
+          // If battle started, transition to countdown/test
+          if (data.status === 'countdown' && !showingIntermediateResults) {
+            showCountdown(roomCode);
+            return;
+          }
+          if (data.status === 'active' && !showingIntermediateResults) {
+            startBattleTest(roomCode);
+            return;
+          }
+          if (data.status === 'finished') {
+            showFinalResults(roomCode);
+            return;
+          }
+
+          // Render lobby
+          renderLobby(roomCode, data, isCreator);
+        });
+      }
+
+      function renderLobby(roomCode, data, isCreator) {
+        const players = data.players ? Object.values(data.players) : [];
+        const shareUrl = window.location.origin + window.location.pathname + '?room=' + roomCode;
+
+        document.getElementById('app').innerHTML = `
+          ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
+          <div class="container fade-in" style="max-width:600px;">
+            <div style="text-align:center;margin:20px 0;">
+              <h2 class="battle-title-glow">Ожидание игроков</h2>
+              <p style="color:var(--text-muted);">Тест: <strong>${Utils.escapeHtml(data.testTitle)}</strong></p>
+            </div>
+
+            <div class="card battle-room-card" style="text-align:center;margin-bottom:20px;">
+              <div style="margin-bottom:16px;">
+                <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:4px;">Код комнаты</div>
+                <div class="room-code-display">${roomCode}</div>
+              </div>
+              <div style="margin-bottom:16px;">
+                <div style="color:var(--text-muted);font-size:0.85rem;margin-bottom:4px;">Ссылка для друзей</div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="text" value="${shareUrl}" class="form-control" style="font-size:0.8rem;text-align:center;" readonly id="shareUrl">
+                  <button onclick="copyLink()" class="btn btn-sm btn-outline" id="copyBtn">Копировать</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom:20px;">
+              <div class="card-header">Игроки (${players.length})</div>
+              <div class="battle-players-list">
+                ${players.map((p, i) => `
+                  <div class="battle-player-item">
+                    <div class="battle-player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                    <div>
+                      <div style="font-weight:600;">${Utils.escapeHtml(p.name)}</div>
+                      ${p.group ? `<div style="color:var(--text-muted);font-size:0.8rem;">${Utils.escapeHtml(p.group)}</div>` : ''}
+                    </div>
+                    ${p.name === data.createdBy ? '<span class="badge badge-live" style="margin-left:auto;">HOST</span>' : ''}
+                  </div>
+                `).join('')}
+              </div>
+              ${players.length < 2 ? `
+                <p style="color:var(--text-muted);text-align:center;margin-top:16px;font-size:0.9rem;">
+                  Ожидание ещё хотя бы одного игрока...
+                </p>
+              ` : ''}
+            </div>
+
+            ${isCreator ? `
+              <button id="startBattleBtn" class="btn btn-accent btn-block btn-lg" ${players.length < 2 ? 'disabled style="opacity:0.5;"' : ''}>
+                Начать игру (${players.length} игрок${players.length >= 2 && players.length <= 4 ? 'а' : 'ов'})
+              </button>
+            ` : `
+              <div style="text-align:center;color:var(--text-muted);padding:20px;">
+                <div class="battle-waiting-pulse"></div>
+                Ожидание начала игры от хоста...
+              </div>
+            `}
+          </div>
+        `;
+
+        if (isCreator && players.length >= 2) {
+          document.getElementById('startBattleBtn').addEventListener('click', () => {
+            Storage.startBattle(roomCode);
+          });
+        }
+      }
+
+      window.copyLink = function() {
+        const input = document.getElementById('shareUrl');
+        input.select();
+        navigator.clipboard.writeText(input.value).then(() => {
+          Utils.showNotification('Ссылка скопирована!', 'success');
+          document.getElementById('copyBtn').textContent = 'Скопировано!';
+        }).catch(() => {
+          document.execCommand('copy');
+          Utils.showNotification('Ссылка скопирована!', 'success');
+        });
+      };
+
+      function showCountdown(roomCode) {
+        let count = 3;
+        const render = () => {
+          document.getElementById('app').innerHTML = `
+            <div class="battle-countdown-screen">
+              <div class="battle-countdown-number ${count === 0 ? 'go' : ''}">${count === 0 ? 'GO!' : count}</div>
+              <p style="color:var(--text-muted);margin-top:20px;">${battle.testTitle}</p>
+            </div>
+          `;
+        };
+        render();
+        const iv = setInterval(() => {
+          count--;
+          if (count < 0) {
+            clearInterval(iv);
+            return;
+          }
+          render();
+        }, 1000);
+      }
+
+      function startBattleTest(roomCode) {
+        if (timerInterval) return; // already started
+        testData = Storage.getTest(battle.testId);
+        if (!testData) return;
+
+        answers = new Array(testData.questions.length).fill(-1);
+        questionStartTimes = new Array(testData.questions.length).fill(0);
+        currentQuestion = 0;
+        timeLeft = testData.timeLimit;
+        testStartTime = Date.now();
+        questionStartTimes[0] = Date.now();
+        showingIntermediateResults = false;
+        intermediateShownAt = new Set();
+
+        timerInterval = setInterval(() => {
+          timeLeft--;
+          updateBattleTimer();
+          if (timeLeft <= 0) {
+            finishBattleTest(roomCode);
+          }
+        }, 1000);
+
+        renderBattleQuestion(roomCode);
+      }
+
+      function updateBattleTimer() {
+        const el = document.getElementById('battle-timer');
+        if (!el) return;
+        el.textContent = Utils.formatTime(timeLeft);
+        el.className = 'timer';
+        if (timeLeft <= 30) el.classList.add('danger');
+        else if (timeLeft <= 60) el.classList.add('warning');
+      }
+
+      function renderBattleQuestion(roomCode) {
+        if (showingIntermediateResults) return;
+        const q = testData.questions[currentQuestion];
+        const progress = ((currentQuestion + 1) / testData.questions.length) * 100;
+        const players = battle && battle.players ? Object.values(battle.players) : [];
+        const totalPlayers = players.length;
+
+        // Build mini player progress indicators
+        const playersProgress = players.map(p => {
+          const pct = Math.round((p.answeredCount / testData.questions.length) * 100);
+          const isMe = p.id === myPlayerId;
+          return `<div class="battle-mini-player ${isMe ? 'me' : ''}" title="${Utils.escapeHtml(p.name)}">
+            <span class="battle-mini-avatar">${p.name.charAt(0)}</span>
+            <div class="battle-mini-bar"><div class="battle-mini-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('');
+
+        document.getElementById('app').innerHTML = `
+          <div class="battle-test-header">
+            <div class="battle-test-info">
+              <span class="badge badge-live">LIVE</span>
+              <span style="font-weight:600;">${Utils.escapeHtml(testData.title)}</span>
+            </div>
+            <div id="battle-timer" class="timer">${Utils.formatTime(timeLeft)}</div>
+          </div>
+
+          <div class="battle-players-progress">${playersProgress}</div>
+
+          <div class="container slide-in" style="max-width:700px;">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width:${progress}%"></div>
+            </div>
+
+            <div class="question-card card">
+              <div class="question-number">Вопрос ${currentQuestion + 1} из ${testData.questions.length}</div>
+              <div class="question-text">${Utils.escapeHtml(q.text)}</div>
+              <div class="options-list">
+                ${q.options.map((opt, i) => `
+                  <button class="option-btn ${answers[currentQuestion] === i ? 'selected' : ''}"
+                          onclick="battleSelectAnswer(${i})">
+                    <strong>${String.fromCharCode(65 + i)}.</strong> ${Utils.escapeHtml(opt)}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="question-nav">
+              <button onclick="battlePrev()" class="btn btn-outline btn-sm" ${currentQuestion === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : ''}>
+                &#8592; Назад
+              </button>
+              <div class="question-dots">
+                ${testData.questions.map((_, i) => `
+                  <button class="question-dot ${i === currentQuestion ? 'active' : ''} ${answers[i] >= 0 ? 'answered' : ''}"
+                          onclick="battleGoTo(${i})">${i + 1}</button>
+                `).join('')}
+              </div>
+              ${currentQuestion === testData.questions.length - 1 ? `
+                <button onclick="battleFinish()" class="btn btn-accent btn-sm">Завершить &#10003;</button>
+              ` : `
+                <button onclick="battleNext()" class="btn btn-primary btn-sm">Далее &#8594;</button>
+              `}
+            </div>
+          </div>
+        `;
+        updateBattleTimer();
+      }
+
+      window.battleSelectAnswer = function(index) {
+        const wasUnanswered = answers[currentQuestion] === -1;
+        answers[currentQuestion] = index;
+
+        // Track correct count
+        const q = testData.questions[currentQuestion];
+        let correctCount = 0;
+        let answeredCount = 0;
+        answers.forEach((a, i) => {
+          if (a >= 0) {
+            answeredCount++;
+            if (a === testData.questions[i].correct) correctCount++;
+          }
+        });
+
+        // Update Firebase
+        const roomCode = localStorage.getItem('battle_room');
+        Storage.updateBattlePlayer(roomCode, myPlayerId, {
+          currentQuestion: currentQuestion,
+          correctCount: correctCount,
+          answeredCount: answeredCount,
+          ['answers/' + currentQuestion]: {
+            selected: index,
+            isCorrect: index === q.correct,
+            answeredAt: Date.now(),
+          }
+        });
+
+        // Check if we need intermediate results (every 5 answered questions)
+        const checkpoint = Math.floor(answeredCount / 5) * 5;
+        if (answeredCount > 0 && answeredCount % 5 === 0 && !intermediateShownAt.has(checkpoint) && answeredCount < testData.questions.length) {
+          intermediateShownAt.add(checkpoint);
+          showIntermediateResults(roomCode, checkpoint);
+          return;
+        }
+
+        renderBattleQuestion(roomCode);
+      };
+
+      window.battlePrev = function() {
+        if (currentQuestion > 0) {
+          currentQuestion--;
+          questionStartTimes[currentQuestion] = Date.now();
+          renderBattleQuestion(localStorage.getItem('battle_room'));
+        }
+      };
+
+      window.battleNext = function() {
+        if (currentQuestion < testData.questions.length - 1) {
+          currentQuestion++;
+          questionStartTimes[currentQuestion] = questionStartTimes[currentQuestion] || Date.now();
+          renderBattleQuestion(localStorage.getItem('battle_room'));
+        }
+      };
+
+      window.battleGoTo = function(index) {
+        currentQuestion = index;
+        questionStartTimes[currentQuestion] = questionStartTimes[currentQuestion] || Date.now();
+        renderBattleQuestion(localStorage.getItem('battle_room'));
+      };
+
+      window.battleFinish = function() {
+        const unanswered = answers.filter(a => a === -1).length;
+        if (unanswered > 0) {
+          if (!confirm('У вас ' + unanswered + ' вопрос(ов) без ответа. Завершить?')) return;
+        }
+        finishBattleTest(localStorage.getItem('battle_room'));
+      };
+
+      function showIntermediateResults(roomCode, checkpoint) {
+        showingIntermediateResults = true;
+        const players = battle && battle.players ? Object.values(battle.players) : [];
+
+        // Sort by correct count desc, then by speed
+        const sorted = players.slice().sort((a, b) => {
+          if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+          return a.answeredCount - b.answeredCount;
+        });
+
+        const renderIntermediate = () => {
+          const medals = ['&#129351;', '&#129352;', '&#129353;']; // gold, silver, bronze
+          document.getElementById('app').innerHTML = `
+            <div class="battle-intermediate-overlay">
+              <div class="battle-intermediate-card card fade-in">
+                <div style="text-align:center;margin-bottom:20px;">
+                  <h2 style="color:var(--accent);">Промежуточные результаты</h2>
+                  <p style="color:var(--text-muted);">После ${checkpoint} вопросов</p>
+                </div>
+
+                <div class="battle-standings">
+                  ${sorted.map((p, i) => {
+                    const isMe = p.id === myPlayerId;
+                    return `
+                      <div class="battle-standing-row ${isMe ? 'is-me' : ''}">
+                        <div class="battle-standing-rank">
+                          ${i < 3 ? medals[i] : (i + 1)}
+                        </div>
+                        <div class="battle-standing-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                        <div class="battle-standing-info">
+                          <div style="font-weight:600;">${Utils.escapeHtml(p.name)} ${isMe ? '<span style="color:var(--primary-light);">(вы)</span>' : ''}</div>
+                          <div style="color:var(--text-muted);font-size:0.8rem;">Ответов: ${p.answeredCount} / ${testData.questions.length}</div>
+                        </div>
+                        <div class="battle-standing-score">
+                          <div style="font-size:1.3rem;font-weight:800;color:var(--success);">${p.correctCount}</div>
+                          <div style="font-size:0.7rem;color:var(--text-muted);">верных</div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+
+                <div style="text-align:center;margin-top:24px;">
+                  <button id="continueBtn" class="btn btn-primary btn-lg">Продолжить <span id="countdownSec">(7)</span></button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          // Auto-continue after 7 seconds
+          let sec = 7;
+          const countdownEl = document.getElementById('countdownSec');
+          const autoClose = setInterval(() => {
+            sec--;
+            if (countdownEl) countdownEl.textContent = '(' + sec + ')';
+            if (sec <= 0) {
+              clearInterval(autoClose);
+              closeIntermediate();
+            }
+          }, 1000);
+
+          document.getElementById('continueBtn').addEventListener('click', () => {
+            clearInterval(autoClose);
+            closeIntermediate();
+          });
+        };
+
+        const closeIntermediate = () => {
+          showingIntermediateResults = false;
+          renderBattleQuestion(roomCode);
+        };
+
+        renderIntermediate();
+      }
+
+      function finishBattleTest(roomCode) {
+        if (!testData) return;
+        clearInterval(timerInterval);
+        timerInterval = null;
+
+        const timeSpent = Math.round((Date.now() - testStartTime) / 1000);
+        let correctCount = 0;
+        answers.forEach((a, i) => {
+          if (a >= 0 && a === testData.questions[i].correct) correctCount++;
+        });
+
+        Storage.updateBattlePlayer(roomCode, myPlayerId, {
+          finished: true,
+          finishedAt: Date.now(),
+          timeSpent: timeSpent,
+          correctCount: correctCount,
+          answeredCount: answers.filter(a => a >= 0).length,
+        });
+
+        // Also save as regular result
+        const score = Math.round((correctCount / testData.questions.length) * 100);
+        const result = {
+          id: Storage.generateId(),
+          testId: testData.id,
+          testTitle: testData.title,
+          userName: Storage.getUser().name,
+          userGroup: Storage.getUser().group || '',
+          score,
+          correctCount,
+          totalQuestions: testData.questions.length,
+          timeSpent,
+          answers: testData.questions.map((q, i) => ({
+            questionId: q.id,
+            selected: answers[i],
+            correct: q.correct,
+            isCorrect: answers[i] === q.correct,
+          })),
+          completedAt: Date.now(),
+          battleRoom: roomCode,
+        };
+        Storage.saveResult(result);
+
+        showWaitingForOthers(roomCode);
+      }
+
+      function showWaitingForOthers(roomCode) {
+        // Listen for all players to finish
+        const checkFinished = () => {
+          if (!battle || !battle.players) return;
+          const players = Object.values(battle.players);
+          const allDone = players.every(p => p.finished);
+          if (allDone) {
+            Storage.finishBattle(roomCode);
+          }
+        };
+
+        // Re-render waiting screen with live data
+        const renderWaiting = () => {
+          if (!battle) return;
+          const players = Object.values(battle.players || {});
+          const finished = players.filter(p => p.finished).length;
+          const total = players.length;
+
+          if (battle.status === 'finished') {
+            showFinalResults(roomCode);
+            return;
+          }
+
+          document.getElementById('app').innerHTML = `
+            <div class="container fade-in" style="max-width:600px;text-align:center;margin-top:60px;">
+              <div class="card">
+                <h2 style="margin-bottom:16px;">Вы завершили тест!</h2>
+                <p style="color:var(--text-muted);margin-bottom:24px;">Ожидание остальных игроков...</p>
+
+                <div class="battle-waiting-players">
+                  ${players.map(p => `
+                    <div class="battle-waiting-player ${p.finished ? 'done' : 'playing'}">
+                      <div class="battle-player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                      <span style="font-weight:600;">${Utils.escapeHtml(p.name)}</span>
+                      ${p.finished
+                        ? '<span style="color:var(--success);margin-left:auto;">&#10003; Готов</span>'
+                        : '<span style="color:var(--warning);margin-left:auto;">&#9881; Играет...</span>'}
+                    </div>
+                  `).join('')}
+                </div>
+
+                <div style="margin-top:20px;color:var(--text-muted);">
+                  ${finished} / ${total} завершили
+                </div>
+                <div class="progress-bar-container" style="margin-top:12px;">
+                  <div class="progress-bar" style="width:${(finished/total)*100}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          checkFinished();
+        };
+
+        // Update on battle changes
+        if (battleRef) Storage.offBattleChange(battleRef);
+        battleRef = Storage.onBattleChange(roomCode, (data) => {
+          battle = data;
+          renderWaiting();
+        });
+      }
+
+      function showFinalResults(roomCode) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        showingIntermediateResults = false;
+
+        if (!battle || !battle.players) return;
+        const players = Object.values(battle.players);
+        testData = testData || Storage.getTest(battle.testId);
+
+        // Sort by correct count desc, then by time spent asc
+        const sorted = players.slice().sort((a, b) => {
+          if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+          return (a.timeSpent || 9999) - (b.timeSpent || 9999);
+        });
+
+        const topCount = Math.min(sorted.length, 3);
+        const medals = ['&#129351;', '&#129352;', '&#129353;'];
+        const medalLabels = ['1-е место', '2-е место', '3-е место'];
+        const podiumColors = ['var(--gold)', 'var(--silver)', 'var(--bronze)'];
+
+        // Build podium (reorder for visual: 2nd, 1st, 3rd)
+        let podiumOrder = [];
+        if (topCount >= 2) podiumOrder.push({ ...sorted[1], rank: 1 });
+        podiumOrder.push({ ...sorted[0], rank: 0 });
+        if (topCount >= 3) podiumOrder.push({ ...sorted[2], rank: 2 });
+        // If only 1 player
+        if (topCount === 1) podiumOrder = [{ ...sorted[0], rank: 0 }];
+
+        const totalQ = testData ? testData.questions.length : (battle.questionsCount || '?');
+
+        document.getElementById('app').innerHTML = `
+          ${Storage.getUser() ? Utils.renderHeader(Storage.getUser(), 'battle') : ''}
+          <div class="container fade-in" style="max-width:700px;">
+            <div style="text-align:center;margin:30px 0 20px;">
+              <h1 class="battle-title-glow">Результаты Battle</h1>
+              <p style="color:var(--text-muted);">${Utils.escapeHtml(battle.testTitle)}</p>
+            </div>
+
+            <div class="battle-podium">
+              ${podiumOrder.map(p => {
+                const r = p.rank;
+                const isMe = p.id === myPlayerId;
+                const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
+                return `
+                  <div class="battle-podium-item rank-${r} ${isMe ? 'is-me' : ''}">
+                    <div class="battle-podium-medal">${medals[r]}</div>
+                    <div class="battle-podium-avatar" style="border-color:${podiumColors[r]};">${p.name.charAt(0).toUpperCase()}</div>
+                    <div class="battle-podium-name">${Utils.escapeHtml(p.name)}</div>
+                    <div class="battle-podium-score">${p.correctCount}/${totalQ}</div>
+                    <div class="battle-podium-pct">${score}%</div>
+                    <div class="battle-podium-time">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</div>
+                    <div class="battle-podium-label" style="color:${podiumColors[r]};">${medalLabels[r]}</div>
+                    <div class="battle-podium-bar" style="height:${r === 0 ? 120 : r === 1 ? 90 : 60}px;background:${podiumColors[r]};"></div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            ${sorted.length > 3 ? `
+              <div class="card" style="margin-top:20px;">
+                <div class="card-header">Все участники</div>
+                <table class="leaderboard-table">
+                  <thead>
+                    <tr><th>#</th><th>Игрок</th><th style="text-align:right;">Баллы</th><th style="text-align:right;">Время</th></tr>
+                  </thead>
+                  <tbody>
+                    ${sorted.map((p, i) => {
+                      const isMe = p.id === myPlayerId;
+                      const score = totalQ ? Math.round((p.correctCount / totalQ) * 100) : 0;
+                      return `
+                        <tr class="${isMe ? 'highlight-row' : ''}">
+                          <td class="rank-cell ${i < 3 ? 'rank-' + (i+1) : ''}">${i < 3 ? medals[i] : (i + 1)}</td>
+                          <td class="name-cell">${Utils.escapeHtml(p.name)} ${isMe ? '(вы)' : ''}</td>
+                          <td class="score-cell">${p.correctCount}/${totalQ} (${score}%)</td>
+                          <td class="time-cell">${p.timeSpent ? Utils.formatTime(p.timeSpent) : '--:--'}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
+
+            <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap;justify-content:center;">
+              <a href="battle.html" class="btn btn-accent">Новая игра</a>
+              <a href="tests.html" class="btn btn-outline">К тестам</a>
+              <a href="leaderboard.html?test=${battle.testId}" class="btn btn-outline">Общий рейтинг</a>
+            </div>
+          </div>
+        `;
+
+        // Clear battle state from localStorage
+        localStorage.removeItem('battle_player_id');
+        localStorage.removeItem('battle_room');
+        localStorage.removeItem('battle_is_creator');
+      }
+
+    })();
+  </script>
+</body>
+</html>

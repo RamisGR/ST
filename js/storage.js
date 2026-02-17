@@ -101,13 +101,26 @@ const Storage = (() => {
     if (!raw) {
       const samples = SampleTests.getAll();
       localStorage.setItem(KEYS.TESTS, JSON.stringify(samples));
-      // Push samples to Firebase if online
       if (firebaseReady) {
         samples.forEach(t => db.ref('tests/' + t.id).set(t));
       }
       return samples;
     }
-    return JSON.parse(raw);
+    // Ensure any new sample tests are added to existing list
+    const existing = JSON.parse(raw);
+    const samples = SampleTests.getAll();
+    let updated = false;
+    samples.forEach(s => {
+      if (!existing.find(e => e.id === s.id)) {
+        existing.push(s);
+        updated = true;
+        if (firebaseReady) db.ref('tests/' + s.id).set(s);
+      }
+    });
+    if (updated) {
+      localStorage.setItem(KEYS.TESTS, JSON.stringify(existing));
+    }
+    return existing;
   }
 
   function getTest(id) {
@@ -252,6 +265,99 @@ const Storage = (() => {
     }
   }
 
+  // ——— Battle Rooms (competitive mode) ———
+  function generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  function createBattle(testId, testTitle, questionsCount, timeLimit, creatorName) {
+    const roomCode = generateRoomCode();
+    const battle = {
+      id: roomCode,
+      testId,
+      testTitle,
+      questionsCount,
+      timeLimit,
+      createdBy: creatorName,
+      createdAt: Date.now(),
+      status: 'waiting', // waiting | countdown | active | finished
+      startedAt: null,
+      players: {},
+    };
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode).set(battle);
+    }
+    return battle;
+  }
+
+  function joinBattle(roomCode, playerName, playerGroup) {
+    const playerId = generateId();
+    const player = {
+      id: playerId,
+      name: playerName,
+      group: playerGroup,
+      joinedAt: Date.now(),
+      currentQuestion: 0,
+      correctCount: 0,
+      answeredCount: 0,
+      answers: {},
+      finished: false,
+      finishedAt: null,
+      timeSpent: 0,
+    };
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
+    }
+    return playerId;
+  }
+
+  function updateBattlePlayer(roomCode, playerId, data) {
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode + '/players/' + playerId).update(data);
+    }
+  }
+
+  function startBattle(roomCode) {
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode).update({
+        status: 'countdown',
+        startedAt: Date.now(),
+      });
+      // After 4 seconds, set status to active (3-2-1-GO)
+      setTimeout(() => {
+        db.ref('battles/' + roomCode + '/status').set('active');
+      }, 4000);
+    }
+  }
+
+  function finishBattle(roomCode) {
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode + '/status').set('finished');
+    }
+  }
+
+  function onBattleChange(roomCode, callback) {
+    if (!firebaseReady) return null;
+    const ref = db.ref('battles/' + roomCode);
+    ref.on('value', (snapshot) => {
+      const data = snapshot.val();
+      callback(data);
+    });
+    return ref;
+  }
+
+  function offBattleChange(ref) {
+    if (ref) ref.off();
+  }
+
+  function getBattleRef(roomCode) {
+    if (!firebaseReady) return null;
+    return db.ref('battles/' + roomCode);
+  }
+
   // ——— Utility ———
   function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -269,5 +375,10 @@ const Storage = (() => {
     getSessions, saveSession, removeSession, clearSessions,
     clearAllResults, resetAllData,
     generateId,
+    // Battle
+    createBattle, joinBattle, updateBattlePlayer,
+    startBattle, finishBattle,
+    onBattleChange, offBattleChange, getBattleRef,
+    generateRoomCode,
   };
 })();
