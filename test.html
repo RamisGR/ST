@@ -192,7 +192,9 @@
           completedAt: Date.now(),
         };
 
-        Storage.saveResult(result);
+        if (user.role !== 'admin') {
+          Storage.saveResult(result);
+        }
         showResults(result);
       }
 

@@ -262,7 +262,7 @@
           } else {
             // Join as player
             isObserver = false;
-            myPlayerId = Storage.joinBattle(b.id, name, user ? user.group : '');
+            myPlayerId = Storage.joinBattle(b.id, name, user ? (user.group || '') : '');
             localStorage.setItem('battle_player_id', myPlayerId);
             localStorage.setItem('battle_is_observer', 'false');
           }
