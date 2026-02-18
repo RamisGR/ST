@@ -603,3 +603,113 @@ label {
 .slide-in {
   animation: slideIn 0.4s ease forwards;
 }
+
+/* QUESTION IMAGES (test/battle display) */
+.question-image-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  max-height: 260px;
+  flex-shrink: 0;
+}
+
+.question-image {
+  width: 100%;
+  height: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  background: #f4f4f8;
+  display: block;
+}
+
+.question-card--with-img {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+.question-card--with-img .question-card__text {
+  padding: 24px 36px;
+  font-size: clamp(1.3rem, 3.5vw, 2rem);
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* IMAGE UPLOAD ZONE (admin editor) */
+.img-upload-zone {
+  margin-top: 16px;
+}
+
+.img-drop-area {
+  border: 2px dashed #ccc;
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: #f8f8ff;
+  color: #888;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.img-drop-area:hover,
+.img-drop-area.drag-over {
+  border-color: var(--blue);
+  background: rgba(19, 104, 206, 0.05);
+  color: var(--blue);
+}
+
+.img-drop-icon {
+  display: block;
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.img-drop-hint {
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 4px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.img-preview {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.img-preview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.img-preview-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--red);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: transform 0.1s;
+}
+
+.img-preview-remove:hover {
+  transform: scale(1.1);
+}

@@ -96,6 +96,9 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+  <!-- SheetJS for Excel import -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
@@ -103,6 +106,15 @@
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
+
+    // Initialize Firebase Storage for image uploads
+    window.firebaseStorage = null;
+    try {
+      if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+        window.firebaseStorage = firebase.storage();
+      }
+    } catch (e) { console.warn('[TestArena] Firebase Storage unavailable:', e.message); }
+
     (function () {
       // Check if already admin
       let user = Storage.getUser();
@@ -235,9 +247,15 @@
         function renderTestsList() {
           const tests = Storage.getTests();
           document.getElementById('tabContent').innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:10px;">
             <p style="color:#666; font-weight:700;">Total Challenges: ${tests.length}</p>
-            <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">+ New Challenge</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button onclick="document.getElementById('excelImportInput').click()" class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem; background:#f0fff4; border-color:var(--green); color:var(--green);">
+                &#x1F4CA; Import Excel
+              </button>
+              <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFromExcel(this)">
+              <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">+ New Challenge</button>
+            </div>
           </div>
           ${tests.length === 0 ? `
             <div class="empty-state card" style="text-align:center; padding:50px;">
@@ -312,6 +330,9 @@
 
         function renderEditor() {
           if (!editingTest) return;
+          // Expose references so global image-upload handlers can access closure state
+          window._editingTestRef = editingTest;
+          window._rerenderEditor = renderEditor;
           const t = editingTest;
           document.getElementById('tabContent').innerHTML = `
           <div class="editor-section">
@@ -352,6 +373,28 @@
         }
 
         function renderQuestionEditor(q, qi) {
+          const imgSection = q.imageUrl ? `
+            <div id="imgZone_${qi}" class="img-upload-zone">
+              <div class="img-preview">
+                <img src="${Utils.escapeHtml(q.imageUrl)}" alt="Question image">
+                <button class="img-preview-remove" onclick="removeQuestionImage(${qi})" title="Remove image">&times;</button>
+              </div>
+            </div>
+          ` : `
+            <div id="imgZone_${qi}" class="img-upload-zone">
+              <div class="img-drop-area"
+                   onclick="document.getElementById('imgFileInput_${qi}').click()"
+                   ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                   ondragleave="this.classList.remove('drag-over')"
+                   ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleImgDrop(event, ${qi})">
+                <span class="img-drop-icon">&#x1F5BC;</span>
+                <strong style="display:block;">Add Image (optional)</strong>
+                <span class="img-drop-hint">Click or drag &amp; drop &middot; PNG, JPG, GIF, WebP</span>
+              </div>
+              <input type="file" accept="image/*" id="imgFileInput_${qi}" style="display:none" onchange="handleImgUpload(this, ${qi})">
+            </div>
+          `;
+
           return `
           <div class="q-card" data-qi="${qi}">
             <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
@@ -364,7 +407,8 @@
               <input type="text" class="form-control q-text" data-qi="${qi}"
                      value="${Utils.escapeHtml(q.text)}" placeholder="Enter question text here..." style="font-weight:600;">
             </div>
-            <div class="options-editor">
+            ${imgSection}
+            <div class="options-editor" style="margin-top:16px;">
               ${q.options.map((opt, oi) => `
                 <div class="option-row">
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
@@ -542,8 +586,161 @@
           modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
         }
 
+        // Used by Excel import to open test in editor
+        window.openImportedTest = function (test) {
+          editingTest = test;
+          currentTab = 'editor';
+          render();
+        };
+
         render();
       } // end initAdmin
+
+      // ——— Image Upload Helpers (global) ———
+      window.handleImgUpload = async function (input, qi) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const zone = document.getElementById('imgZone_' + qi);
+        if (zone) {
+          zone.innerHTML = '<div style="padding:14px; text-align:center; color:var(--blue); font-weight:700; background:#e8f0fe; border-radius:var(--radius-md); font-size:0.9rem;">Uploading image\u2026</div>';
+        }
+
+        const q = window._editingTestRef && window._editingTestRef.questions[qi];
+        // Access editingTest via the stored ref (set below)
+        const editingTest = window._editingTestRef;
+        if (!editingTest) return;
+
+        const safeName = file.name.replace(/[^\w.\-]/g, '_');
+        const path = 'questions/' + editingTest.id + '/' + editingTest.questions[qi].id + '/' + Date.now() + '_' + safeName;
+
+        if (window.firebaseStorage) {
+          try {
+            const storageRef = window.firebaseStorage.ref(path);
+            const snapshot = await storageRef.put(file);
+            const url = await snapshot.ref.getDownloadURL();
+            editingTest.questions[qi].imageUrl = url;
+          } catch (e) {
+            Utils.showNotification('Image upload failed: ' + e.message, 'error');
+          }
+        } else {
+          // Offline fallback: base64 data URL
+          await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => { editingTest.questions[qi].imageUrl = e.target.result; resolve(); };
+            reader.onerror = () => { Utils.showNotification('Failed to read image', 'error'); resolve(); };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        // Trigger re-render via the exposed render function
+        if (window._rerenderEditor) window._rerenderEditor();
+      };
+
+      window.handleImgDrop = function (event, qi) {
+        const file = event.dataTransfer.files[0];
+        if (!file || !file.type.startsWith('image/')) {
+          Utils.showNotification('Please drop an image file', 'error');
+          return;
+        }
+        window.handleImgUpload({ files: [file] }, qi);
+      };
+
+      window.removeQuestionImage = function (qi) {
+        const editingTest = window._editingTestRef;
+        if (editingTest && editingTest.questions[qi]) {
+          editingTest.questions[qi].imageUrl = null;
+          if (window._rerenderEditor) window._rerenderEditor();
+        }
+      };
+
+      // ——— Excel Import (global) ———
+      window.importFromExcel = function (input) {
+        const file = input.files[0];
+        if (!file) return;
+        input.value = '';
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            if (typeof XLSX === 'undefined') {
+              alert('Excel library not loaded. Please check your internet connection.');
+              return;
+            }
+            const wb = XLSX.read(e.target.result, { type: 'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+            if (!rows || rows.length < 2) {
+              alert('The file appears to be empty or has too few rows.');
+              return;
+            }
+
+            // Row 1: test title (cell A1)
+            const testTitle = String(rows[0][0] || '').trim() || 'Imported Test';
+
+            // Auto-detect if row 2 is a header row (column F is not a valid answer)
+            let startRow = 1;
+            if (rows[1] && !_isValidAnswer(String(rows[1][5] || ''))) {
+              startRow = 2;
+            }
+
+            const questions = [];
+            for (let i = startRow; i < rows.length; i++) {
+              const row = rows[i];
+              const text = String(row[0] || '').trim();
+              if (!text) continue;
+
+              const options = [
+                String(row[1] || '').trim(),
+                String(row[2] || '').trim(),
+                String(row[3] || '').trim(),
+                String(row[4] || '').trim(),
+              ].filter(o => o);
+
+              if (options.length < 2) continue;
+
+              const correctRaw = String(row[5] || '1').trim().toUpperCase();
+              let correct = 0;
+              if (['A', 'B', 'C', 'D'].includes(correctRaw)) {
+                correct = correctRaw.charCodeAt(0) - 65;
+              } else {
+                correct = Math.max(0, (parseInt(correctRaw) || 1) - 1);
+              }
+              correct = Math.min(correct, options.length - 1);
+
+              questions.push({ id: Storage.generateId(), text, options, correct });
+            }
+
+            if (questions.length === 0) {
+              alert('No valid questions found.\n\nExpected format:\nRow 1: Test title (cell A1)\nRow 2: (optional header)\nRows 3+: Question | Option A | Option B | Option C | Option D | Correct (A/B/C/D or 1/2/3/4)');
+              return;
+            }
+
+            const test = {
+              id: Storage.generateId(),
+              title: testTitle,
+              description: 'Imported from Excel',
+              timeLimit: 300,
+              createdAt: Date.now(),
+              questions,
+            };
+
+            Storage.saveTest(test);
+            Utils.showNotification('\u2705 Imported ' + questions.length + ' questions!', 'success');
+
+            if (window.openImportedTest) window.openImportedTest(test);
+          } catch (err) {
+            alert('Error reading file: ' + err.message);
+          }
+        };
+        reader.onerror = function () { alert('Failed to read the file.'); };
+        reader.readAsArrayBuffer(file);
+      };
+
+      function _isValidAnswer(val) {
+        return /^[ABCD1234]$/i.test(val.trim());
+      }
     })();
   </script>
 </body>

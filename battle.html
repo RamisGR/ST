@@ -649,8 +649,13 @@
                <div class="timer-circle" style="margin:0;">${timeLeft}</div>
             </div>
 
-            <div class="question-card">
-              ${Utils.escapeHtml(q.text)}
+            <div class="question-card ${q.imageUrl ? 'question-card--with-img' : ''}">
+              ${q.imageUrl ? `
+                <div class="question-image-wrap">
+                  <img src="${Utils.escapeHtml(q.imageUrl)}" class="question-image" alt="Question image" onerror="this.parentElement.style.display='none'">
+                </div>
+                <div class="question-card__text">${Utils.escapeHtml(q.text)}</div>
+              ` : Utils.escapeHtml(q.text)}
             </div>
 
             <div class="answer-grid">
