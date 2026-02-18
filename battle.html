@@ -232,6 +232,13 @@
           </div>
         `;
 
+        // Pre-select test if ?test= param provided (e.g. from admin panel Battle button)
+        const testParam = Utils.getQueryParam('test');
+        if (testParam) {
+          const sel = document.getElementById('testSelect');
+          if (sel) sel.value = testParam;
+        }
+
         document.getElementById('createBtn').addEventListener('click', () => {
           const testId = document.getElementById('testSelect').value;
           const name = user ? user.name : document.getElementById('creatorName').value.trim();
