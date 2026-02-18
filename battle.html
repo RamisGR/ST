@@ -353,18 +353,18 @@
       function renderLobby(roomCode, data, isCreator) {
         const players = data.players ? Object.values(data.players) : [];
         const joinUrl = location.protocol + '//' + location.host + location.pathname + '?room=' + roomCode;
-        const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(joinUrl) + '&margin=10&format=png';
+        const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(joinUrl) + '&margin=10&format=png';
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:40px;">
-             ${isObserver ? `<div class="teacher-badge">👁️ OBSERVER MODE — You are watching</div>` : ''}
+             ${isObserver ? `<div style="display:inline-block; font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; margin-bottom:18px;">👁 Observer mode</div>` : ''}
 
              <div class="pin-card">
                <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">Game PIN</div>
                <div style="font-size:5rem; font-weight:900; letter-spacing:8px; line-height:1; font-family:var(--font-display);">${roomCode}</div>
                <div style="margin-top:16px; display:flex; align-items:center; justify-content:center; gap:30px; flex-wrap:wrap;">
                  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-                   <img src="${qrSrc}" alt="QR" style="width:160px; height:160px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15);">
+                   <img src="${qrSrc}" alt="QR" style="width:280px; height:280px; border-radius:16px; box-shadow:0 6px 24px rgba(0,0,0,0.18);">
                    <span style="font-size:0.75rem; color:#aaa; font-weight:700; text-transform:uppercase; letter-spacing:1px;">Scan to join</span>
                  </div>
                  <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
