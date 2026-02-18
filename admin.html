@@ -694,42 +694,17 @@
         if (!editingTest) return;
 
         const q = editingTest.questions[qi];
-        let uploadedViaStorage = false;
 
-        if (window.firebaseStorage) {
-          let uploadTask = null;
-          try {
-            const safeName = file.name.replace(/[^\w.\-]/g, '_');
-            const path = 'questions/' + editingTest.id + '/' + q.id + '/' + Date.now() + '_' + safeName;
-            const storageRef = window.firebaseStorage.ref(path);
-            uploadTask = storageRef.put(file);
-
-            const snapshot = await Promise.race([
-              uploadTask,
-              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-            ]);
-            const url = await snapshot.ref.getDownloadURL();
-            q.imageUrl = url;
-            uploadedViaStorage = true;
-          } catch (e) {
-            if (uploadTask) try { uploadTask.cancel(); } catch (_) {}
-            // CORS, timeout or other error — fall back to Base64
-            console.warn('[TestArena] Firebase Storage upload failed, falling back to Base64:', e.message);
-          }
+        // Base64 encoding — instant, no network required, no CORS issues
+        if (file.size > 500 * 1024) {
+          Utils.showNotification('Для лучшей производительности используйте изображения < 500 KB', 'warning');
         }
-
-        if (!uploadedViaStorage) {
-          // Base64 fallback: works without CORS configuration
-          if (file.size > 500 * 1024) {
-            Utils.showNotification('Изображение сохранено локально. Для лучшей производительности используйте файлы < 500KB или настройте Firebase Storage CORS.', 'warning');
-          }
-          await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (evt) => { q.imageUrl = evt.target.result; resolve(); };
-            reader.onerror = () => { Utils.showNotification('Failed to read image', 'error'); resolve(); };
-            reader.readAsDataURL(file);
-          });
-        }
+        await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (evt) => { q.imageUrl = evt.target.result; resolve(); };
+          reader.onerror = () => { Utils.showNotification('Failed to read image', 'error'); resolve(); };
+          reader.readAsDataURL(file);
+        });
 
         // Trigger re-render via the exposed render function
         if (window._rerenderEditor) window._rerenderEditor();
