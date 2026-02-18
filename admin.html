@@ -606,28 +606,35 @@
           zone.innerHTML = '<div style="padding:14px; text-align:center; color:var(--blue); font-weight:700; background:#e8f0fe; border-radius:var(--radius-md); font-size:0.9rem;">Uploading image\u2026</div>';
         }
 
-        const q = window._editingTestRef && window._editingTestRef.questions[qi];
-        // Access editingTest via the stored ref (set below)
         const editingTest = window._editingTestRef;
         if (!editingTest) return;
 
-        const safeName = file.name.replace(/[^\w.\-]/g, '_');
-        const path = 'questions/' + editingTest.id + '/' + editingTest.questions[qi].id + '/' + Date.now() + '_' + safeName;
+        const q = editingTest.questions[qi];
+        let uploadedViaStorage = false;
 
         if (window.firebaseStorage) {
           try {
+            const safeName = file.name.replace(/[^\w.\-]/g, '_');
+            const path = 'questions/' + editingTest.id + '/' + q.id + '/' + Date.now() + '_' + safeName;
             const storageRef = window.firebaseStorage.ref(path);
             const snapshot = await storageRef.put(file);
             const url = await snapshot.ref.getDownloadURL();
-            editingTest.questions[qi].imageUrl = url;
+            q.imageUrl = url;
+            uploadedViaStorage = true;
           } catch (e) {
-            Utils.showNotification('Image upload failed: ' + e.message, 'error');
+            // CORS or other error — fall back to Base64
+            console.warn('[TestArena] Firebase Storage upload failed, falling back to Base64:', e.message);
           }
-        } else {
-          // Offline fallback: base64 data URL
+        }
+
+        if (!uploadedViaStorage) {
+          // Base64 fallback: works without CORS configuration
+          if (file.size > 500 * 1024) {
+            Utils.showNotification('Изображение сохранено локально. Для лучшей производительности используйте файлы < 500KB или настройте Firebase Storage CORS.', 'warning');
+          }
           await new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onload = (e) => { editingTest.questions[qi].imageUrl = e.target.result; resolve(); };
+            reader.onload = (evt) => { q.imageUrl = evt.target.result; resolve(); };
             reader.onerror = () => { Utils.showNotification('Failed to read image', 'error'); resolve(); };
             reader.readAsDataURL(file);
           });
