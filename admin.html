@@ -613,16 +613,23 @@
         let uploadedViaStorage = false;
 
         if (window.firebaseStorage) {
+          let uploadTask = null;
           try {
             const safeName = file.name.replace(/[^\w.\-]/g, '_');
             const path = 'questions/' + editingTest.id + '/' + q.id + '/' + Date.now() + '_' + safeName;
             const storageRef = window.firebaseStorage.ref(path);
-            const snapshot = await storageRef.put(file);
+            uploadTask = storageRef.put(file);
+
+            const snapshot = await Promise.race([
+              uploadTask,
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+            ]);
             const url = await snapshot.ref.getDownloadURL();
             q.imageUrl = url;
             uploadedViaStorage = true;
           } catch (e) {
-            // CORS or other error — fall back to Base64
+            if (uploadTask) try { uploadTask.cancel(); } catch (_) {}
+            // CORS, timeout or other error — fall back to Base64
             console.warn('[TestArena] Firebase Storage upload failed, falling back to Base64:', e.message);
           }
         }
