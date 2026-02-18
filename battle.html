@@ -127,6 +127,154 @@
       color: #555;
       cursor: pointer;
     }
+
+    /* Rating Screen */
+    .rating-screen {
+      background: white;
+      border-radius: var(--radius-md);
+      padding: 30px 30px 20px;
+      box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .rating-bars-vertical {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 20px;
+      height: 260px;
+      padding: 20px 0 0;
+    }
+
+    .rating-bar-col {
+      flex: 1;
+      max-width: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      height: 100%;
+      position: relative;
+    }
+
+    .rating-bar-fill {
+      width: 100%;
+      border-radius: 10px 10px 0 0;
+      transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      min-height: 8px;
+      position: relative;
+    }
+
+    .rating-bar-fill .bar-count {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: #333;
+      font-family: var(--font-display);
+    }
+
+    .rating-bar-label {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #555;
+      text-align: center;
+      word-break: break-word;
+      max-height: 3.6em;
+      overflow: hidden;
+      line-height: 1.2;
+      width: 100%;
+    }
+
+    .rating-bar-col.correct-answer .rating-bar-fill {
+      box-shadow: 0 0 0 4px var(--green), 0 0 20px rgba(38, 137, 12, 0.3);
+    }
+
+    .rating-bar-col.correct-answer .rating-bar-label {
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    /* Horizontal bars */
+    .rating-bars-horizontal {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 15px 0;
+    }
+
+    .rating-hbar-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .rating-hbar-label {
+      width: 120px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #555;
+      text-align: right;
+      flex-shrink: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .rating-hbar-track {
+      flex: 1;
+      height: 40px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .rating-hbar-fill {
+      height: 100%;
+      border-radius: 8px;
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 10px;
+      min-width: 0;
+    }
+
+    .rating-hbar-fill .bar-count {
+      font-weight: 900;
+      font-size: 0.9rem;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .rating-hbar-row.correct-answer .rating-hbar-track {
+      box-shadow: 0 0 0 3px var(--green), 0 0 15px rgba(38, 137, 12, 0.25);
+    }
+
+    .rating-hbar-row.correct-answer .rating-hbar-label {
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .rating-timer-bar {
+      height: 6px;
+      background: #eee;
+      border-radius: 3px;
+      margin-top: 15px;
+      overflow: hidden;
+    }
+
+    .rating-timer-fill {
+      height: 100%;
+      background: var(--blue);
+      border-radius: 3px;
+      transition: width 0.3s linear;
+    }
   </style>
 </head>
 
@@ -159,7 +307,12 @@
       let testStartTime = 0;
       let showingIntermediateResults = false;
       let joinLock = false;
-      let isObserver = false; // Teacher observer mode
+      let isObserver = false;
+      let battleTestStarted = false; // Guard against re-entry
+      let battleSettings = null;
+      let perQuestionTimeLeft = 0;
+      let ratingTimeLeft = 0;
+      let currentRenderedQuestion = -1; // Track to avoid re-render
 
       // Color/Shape mapping
       const optionConfigs = [
@@ -313,6 +466,7 @@
         battleRef = Storage.onBattleChange(roomCode, (data) => {
           if (!data) return;
           battle = data;
+          battleSettings = data.battleSettings || null;
 
           if (data.status === 'countdown' && !showingIntermediateResults) {
             if (isObserver) {
@@ -325,9 +479,27 @@
           if (data.status === 'active' && !showingIntermediateResults) {
             if (isObserver) {
               renderTeacherDashboard(roomCode);
-            } else {
+            } else if (!battleTestStarted) {
               startBattleTest(roomCode);
+            } else {
+              // Only update timer display, not full re-render
+              const timerEl = document.querySelector('.timer-circle');
+              if (timerEl) {
+                const bs = battleSettings;
+                if (bs && bs.perQuestionMode) {
+                  timerEl.textContent = perQuestionTimeLeft;
+                } else {
+                  timerEl.textContent = timeLeft;
+                }
+              }
             }
+            return;
+          }
+          if (data.status === 'showing_rating') {
+            if (isObserver) {
+              renderTeacherRating(roomCode);
+            }
+            // Students see their own rating via local control
             return;
           }
           if (data.status === 'finished') {
@@ -617,28 +789,56 @@
       }
 
       function startBattleTest(roomCode) {
-        if (timerInterval) return;
+        if (battleTestStarted) return;
+        battleTestStarted = true;
         testData = Storage.getTest(battle.testId);
         if (!testData) return;
-
+        const bs = battleSettings;
         answers = new Array(testData.questions.length).fill(-1);
         currentQuestion = 0;
-        timeLeft = testData.timeLimit;
+        currentRenderedQuestion = -1;
         testStartTime = Date.now();
+        if (bs && bs.perQuestionMode) {
+          perQuestionTimeLeft = bs.perQuestionTime || 20;
+          renderBattleQuestion(roomCode);
+          startPerQuestionTimer(roomCode);
+        } else {
+          timeLeft = testData.timeLimit;
+          renderBattleQuestion(roomCode);
+          timerInterval = setInterval(() => {
+            timeLeft--;
+            const te = document.querySelector('.timer-circle');
+            if (te) { te.textContent = timeLeft; if (timeLeft <= 10) te.style.background = 'var(--red)'; }
+            if (timeLeft <= 0) finishBattleTest(roomCode);
+          }, 1000);
+        }
+      }
 
+      function startPerQuestionTimer(roomCode) {
+        if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-          timeLeft--;
-          if (timeLeft <= 0) finishBattleTest(roomCode);
-          else renderBattleQuestion(roomCode);
+          perQuestionTimeLeft--;
+          const te = document.querySelector('.timer-circle');
+          if (te) { te.textContent = perQuestionTimeLeft; if (perQuestionTimeLeft <= 5) te.style.background = 'var(--red)'; }
+          if (perQuestionTimeLeft <= 0) {
+            clearInterval(timerInterval); timerInterval = null;
+            Storage.saveBattleAnswer(roomCode, myPlayerId, currentQuestion, answers[currentQuestion]);
+            let cc = 0;
+            answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) cc++; });
+            Storage.updateBattlePlayer(roomCode, myPlayerId, { currentQuestion, correctCount: cc, answeredCount: answers.filter(a => a >= 0).length });
+            showingIntermediateResults = true;
+            renderRatingScreen(roomCode, currentQuestion);
+          }
         }, 1000);
-
-        renderBattleQuestion(roomCode);
       }
 
       function renderBattleQuestion(roomCode) {
         if (showingIntermediateResults) return;
+        if (currentRenderedQuestion === currentQuestion) return;
+        currentRenderedQuestion = currentQuestion;
         const q = testData.questions[currentQuestion];
-        const players = battle && battle.players ? Object.values(battle.players) : [];
+        const bs = battleSettings;
+        const displayTime = (bs && bs.perQuestionMode) ? perQuestionTimeLeft : timeLeft;
 
         document.getElementById('app').innerHTML = `
           <div class="container center-content" style="max-width:1000px; padding-top:20px; width:100%;">
@@ -646,74 +846,161 @@
                <div style="background:rgba(0,0,0,0.3); color:white; padding:10px 25px; border-radius:30px; font-weight:900; font-family:var(--font-display); font-size:1.2rem;">
                  ${currentQuestion + 1} / ${testData.questions.length}
                </div>
-               <div class="timer-circle" style="margin:0;">${timeLeft}</div>
+               <div class="timer-circle" style="margin:0;">${displayTime}</div>
             </div>
-
-            <div class="question-card">
-              ${Utils.escapeHtml(q.text)}
-            </div>
-
+            <div class="question-card">${Utils.escapeHtml(q.text)}</div>
             <div class="answer-grid">
               ${q.options.map((opt, i) => {
           const cfg = optionConfigs[i % 4];
-          const isSelected = answers[currentQuestion] === i;
-          const opacity = (answers[currentQuestion] !== -1 && !isSelected) ? '0.3' : '1';
-          const transform = isSelected ? 'scale(0.98)' : 'scale(1)';
-
-          return `
-                  <button onclick="selectAnswer(${i})" class="btn answer-btn pop-in" 
-                    style="background:${cfg.color}; border-bottom-color:${cfg.shadow}; opacity:${opacity}; transform:${transform}; animation-delay:${i * 0.1}s;">
+          return `<button onclick="selectAnswer(${i})" class="btn answer-btn pop-in" 
+                    style="background:${cfg.color}; border-bottom-color:${cfg.shadow}; animation-delay:${i * 0.1}s;">
                     <span class="shape-icon ${cfg.shape}"></span>
                     <span>${Utils.escapeHtml(opt)}</span>
-                  </button>
-                `;
-        }).join('')}
-            </div>
-
-            <!-- Players Finished Indicator -->
-            <div style="margin-top:40px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
-              ${players.map(p => {
-          const isMe = p.id === myPlayerId;
-          const done = p.finished;
-          return `
-                   <div style="text-align:center; opacity:${done ? 1 : 0.6}; transition:opacity 0.3s;">
-                     <div class="avatar" style="width:50px; height:50px; font-size:1.2rem; border:3px solid ${isMe ? 'var(--yellow)' : (done ? 'var(--green)' : 'transparent')}; background:${isMe ? 'white' : 'rgba(255,255,255,0.2)'}; color:${isMe ? '#333' : 'white'}; margin:0 auto 5px;">
-                       ${p.name.charAt(0)}
-                     </div>
-                   </div>
-                 `;
+                  </button>`;
         }).join('')}
             </div>
           </div>
         `;
       }
 
-      window.selectAnswer = function (index) {
-        if (answers[currentQuestion] !== -1) return; // Already answered
-
-        answers[currentQuestion] = index;
-
-        // Calculate correctness
-        let correctCount = 0;
-        answers.forEach((a, i) => {
-          if (a >= 0 && a === testData.questions[i].correct) correctCount++;
-        });
-
-        Storage.updateBattlePlayer(localStorage.getItem('battle_room'), myPlayerId, {
-          currentQuestion: currentQuestion,
-          correctCount: correctCount,
-          answeredCount: answers.filter(a => a >= 0).length
-        });
-
-        // Delay for visual feedback before next question
-        setTimeout(() => {
-          if (currentQuestion < testData.questions.length - 1) {
-            currentQuestion++;
-            renderBattleQuestion(localStorage.getItem('battle_room'));
-          } else {
-            finishBattleTest(localStorage.getItem('battle_room'));
+      function buildChartHtml(q, qIndex, bs, players) {
+        const chartType = (bs && bs.chartType) || 'vertical-bar';
+        const showCorrect = !bs || bs.showCorrectAnswer !== false;
+        const showCount = !bs || bs.showPlayerCount !== false;
+        const totalPlayers = players.length || 1;
+        const counts = new Array(q.options.length).fill(0);
+        players.forEach(p => {
+          if (p.answers && p.answers[qIndex] !== undefined && p.answers[qIndex] >= 0) {
+            counts[p.answers[qIndex]]++;
           }
-        }, 500);
+        });
+        const maxCount = Math.max(...counts, 1);
+        if (chartType === 'horizontal-bar') {
+          return `<div class="rating-bars-horizontal">${q.options.map((opt, i) => {
+            const cfg = optionConfigs[i % 4];
+            const pct = Math.round((counts[i] / totalPlayers) * 100);
+            const ic = showCorrect && i === q.correct;
+            return `<div class="rating-hbar-row ${ic ? 'correct-answer' : ''}">
+              <div class="rating-hbar-label">${Utils.escapeHtml(opt)}</div>
+              <div class="rating-hbar-track"><div class="rating-hbar-fill" style="width:0%;background:${cfg.color};" data-target-width="${pct}%">${showCount ? `<span class="bar-count">${counts[i]}</span>` : ''}</div></div>
+            </div>`;
+          }).join('')}</div>`;
+        }
+        return `<div class="rating-bars-vertical">${q.options.map((opt, i) => {
+          const cfg = optionConfigs[i % 4];
+          const pct = maxCount > 0 ? Math.round((counts[i] / maxCount) * 100) : 0;
+          const ic = showCorrect && i === q.correct;
+          return `<div class="rating-bar-col ${ic ? 'correct-answer' : ''}">
+            <div class="rating-bar-fill" style="height:0%;background:${cfg.color};" data-target-height="${pct}%">${showCount ? `<span class="bar-count">${counts[i]}</span>` : ''}</div>
+            <div class="rating-bar-label">${Utils.escapeHtml(opt)}</div>
+          </div>`;
+        }).join('')}</div>`;
+      }
+
+      function renderRatingScreen(roomCode, qIndex) {
+        const q = testData.questions[qIndex];
+        const bs = battleSettings || {};
+        const ratingDuration = bs.ratingDuration || 4;
+        const ratingTitle = bs.ratingTitle || '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432';
+        const players = battle && battle.players ? Object.values(battle.players) : [];
+        const chartHtml = buildChartHtml(q, qIndex, bs, players);
+
+        document.getElementById('app').innerHTML = `
+          <div class="container center-content fade-in" style="max-width:950px;padding-top:20px;text-align:center;">
+            <div style="background:rgba(0,0,0,0.3);color:white;padding:10px 25px;border-radius:30px;font-weight:900;font-family:var(--font-display);font-size:1rem;margin-bottom:15px;">
+              \u0412\u043e\u043f\u0440\u043e\u0441 ${qIndex + 1} / ${testData.questions.length}
+            </div>
+            <div class="rating-screen">
+              <h3 style="margin:0 0 5px;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">${Utils.escapeHtml(ratingTitle)}</h3>
+              <p style="font-size:1.1rem;font-weight:800;color:#333;margin-bottom:15px;line-height:1.3;">${Utils.escapeHtml(q.text)}</p>
+              ${chartHtml}
+              <div class="rating-timer-bar"><div class="rating-timer-fill" id="ratingTimerFill" style="width:100%;"></div></div>
+            </div>
+          </div>`;
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            document.querySelectorAll('[data-target-height]').forEach(el => { el.style.height = el.dataset.targetHeight; });
+            document.querySelectorAll('[data-target-width]').forEach(el => { el.style.width = el.dataset.targetWidth; });
+          }, 50);
+        });
+        ratingTimeLeft = ratingDuration;
+        const ratingIv = setInterval(() => {
+          ratingTimeLeft--;
+          const fill = document.getElementById('ratingTimerFill');
+          if (fill) fill.style.width = `${(ratingTimeLeft / ratingDuration) * 100}%`;
+          if (ratingTimeLeft <= 0) {
+            clearInterval(ratingIv);
+            showingIntermediateResults = false;
+            if (currentQuestion < testData.questions.length - 1) {
+              currentQuestion++;
+              currentRenderedQuestion = -1;
+              perQuestionTimeLeft = (battleSettings && battleSettings.perQuestionTime) || 20;
+              renderBattleQuestion(roomCode);
+              startPerQuestionTimer(roomCode);
+            } else {
+              finishBattleTest(roomCode);
+            }
+          }
+        }, 1000);
+      }
+
+      function renderTeacherRating(roomCode) {
+        if (!battle) return;
+        testData = testData || Storage.getTest(battle.testId);
+        if (!testData) return;
+        const qIndex = battle.currentQuestion || 0;
+        const q = testData.questions[qIndex];
+        if (!q) return;
+        const bs = battle.battleSettings || {};
+        const ratingTitle = bs.ratingTitle || '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432';
+        const players = battle.players ? Object.values(battle.players) : [];
+        const chartHtml = buildChartHtml(q, qIndex, bs, players);
+        document.getElementById('app').innerHTML = `
+          <div class="container center-content fade-in" style="max-width:950px;padding-top:20px;text-align:center;">
+            <div class="teacher-badge">\ud83d\udcca \u0420\u0415\u0419\u0422\u0418\u041d\u0413 \u041e\u0422\u0412\u0415\u0422\u041e\u0412 \u2014 \u0412\u043e\u043f\u0440\u043e\u0441 ${qIndex + 1} / ${testData.questions.length}</div>
+            <div class="rating-screen" style="margin-top:20px;">
+              <h3 style="margin:0 0 5px;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">${Utils.escapeHtml(ratingTitle)}</h3>
+              <p style="font-size:1.1rem;font-weight:800;color:#333;margin-bottom:15px;line-height:1.3;">${Utils.escapeHtml(q.text)}</p>
+              ${chartHtml}
+              <p style="margin-top:15px;color:#999;font-size:0.85rem;">${players.length} \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u043e\u0432</p>
+            </div>
+          </div>`;
+        // Animate bars immediately for teacher
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            document.querySelectorAll('[data-target-height]').forEach(el => { el.style.height = el.dataset.targetHeight; });
+            document.querySelectorAll('[data-target-width]').forEach(el => { el.style.width = el.dataset.targetWidth; });
+          }, 50);
+        });
+      }
+
+      window.selectAnswer = function (index) {
+        if (answers[currentQuestion] !== -1) return;
+        answers[currentQuestion] = index;
+        // Visual feedback via DOM, no re-render
+        document.querySelectorAll('.answer-btn').forEach((btn, i) => {
+          if (i === index) { btn.style.transform = 'scale(0.98)'; btn.style.opacity = '1'; }
+          else { btn.style.opacity = '0.3'; }
+        });
+        let correctCount = 0;
+        answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) correctCount++; });
+        const room = localStorage.getItem('battle_room');
+        const bs = battleSettings;
+        if (bs && bs.perQuestionMode) {
+          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index);
+          Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
+        } else {
+          Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
+          setTimeout(() => {
+            if (currentQuestion < testData.questions.length - 1) {
+              currentQuestion++;
+              currentRenderedQuestion = -1;
+              renderBattleQuestion(room);
+            } else {
+              finishBattleTest(room);
+            }
+          }, 500);
+        }
       };
 
       function finishBattleTest(roomCode) {

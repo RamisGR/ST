@@ -280,6 +280,7 @@ const Storage = (() => {
 
   function createBattle(testId, testTitle, questionsCount, timeLimit, creatorName) {
     const roomCode = generateRoomCode();
+    const test = getTest(testId);
     const battle = {
       id: roomCode,
       testId,
@@ -288,9 +289,19 @@ const Storage = (() => {
       timeLimit,
       createdBy: creatorName,
       createdAt: Date.now(),
-      status: 'waiting', // waiting | countdown | active | finished
+      status: 'waiting', // waiting | countdown | active | showing_rating | finished
       startedAt: null,
+      currentQuestion: 0,
       players: {},
+      battleSettings: test && test.battleSettings ? test.battleSettings : {
+        perQuestionMode: false,
+        perQuestionTime: 20,
+        ratingDuration: 4,
+        chartType: 'vertical-bar',
+        ratingTitle: 'Распределение ответов',
+        showCorrectAnswer: true,
+        showPlayerCount: true,
+      },
     };
     if (firebaseReady) {
       db.ref('battles/' + roomCode).set(battle);
@@ -322,6 +333,18 @@ const Storage = (() => {
   function updateBattlePlayer(roomCode, playerId, data) {
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId).update(data);
+    }
+  }
+
+  function saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex) {
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex).set(answerIndex);
+    }
+  }
+
+  function updateBattleState(roomCode, data) {
+    if (firebaseReady) {
+      db.ref('battles/' + roomCode).update(data);
     }
   }
 
@@ -389,6 +412,7 @@ const Storage = (() => {
     generateId,
     // Battle
     createBattle, joinBattle, updateBattlePlayer,
+    saveBattleAnswer, updateBattleState,
     startBattle, finishBattle,
     onBattleChange, offBattleChange, getBattleOnce, getBattleRef,
     generateRoomCode,

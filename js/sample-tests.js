@@ -9,6 +9,7 @@ const SampleTests = (() => {
       description: 'Проверьте свои знания основ JavaScript',
       timeLimit: 300, // seconds
       createdAt: Date.now(),
+      battleSettings: { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: 'Распределение ответов', showCorrectAnswer: true, showPlayerCount: true },
       questions: [
         {
           id: 'q1',
@@ -98,6 +99,7 @@ const SampleTests = (() => {
       description: 'Тест по основам вёрстки веб-страниц',
       timeLimit: 240,
       createdAt: Date.now() - 100000,
+      battleSettings: { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: 'Распределение ответов', showCorrectAnswer: true, showPlayerCount: true },
       questions: [
         {
           id: 'h1',
@@ -165,6 +167,7 @@ const SampleTests = (() => {
       description: 'Базовые знания языка Python',
       timeLimit: 360,
       createdAt: Date.now() - 200000,
+      battleSettings: { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: 'Распределение ответов', showCorrectAnswer: true, showPlayerCount: true },
       questions: [
         {
           id: 'p1',
@@ -238,6 +241,7 @@ const SampleTests = (() => {
       description: 'Тест по диаграмме растяжения — ключевая тема сопротивления материалов',
       timeLimit: 600,
       createdAt: Date.now() - 300000,
+      battleSettings: { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: 'Распределение ответов', showCorrectAnswer: true, showPlayerCount: true },
       questions: [
         {
           id: 'dr1',
