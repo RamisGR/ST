@@ -79,7 +79,7 @@
           document.getElementById('app').innerHTML = `
             <div class="fade-in">
               <div style="display:flex; align-items:center; gap:20px; margin-bottom:40px;">
-                <a href="tests.html" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.3); padding:10px 20px;">&larr; BACK</a>
+                <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px;">&larr; BACK</a>
                 <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin:0; line-height:1; color:white;">HALL OF FAME</h1>
               </div>
               <div class="test-grid">
@@ -98,7 +98,7 @@
         document.getElementById('app').innerHTML = `
           <div class="fade-in">
             <div style="display:flex; align-items:center; gap:20px; margin-bottom:40px;">
-              <a href="tests.html" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.3); padding:10px 20px; font-weight:700;">&larr; BACK</a>
+              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px; font-weight:700;">&larr; BACK</a>
               <div>
                 <div style="font-size:1rem; color:rgba(255,255,255,0.7); font-weight:800; text-transform:uppercase; letter-spacing:1px;">Leaderboard</div>
                 <h1 style="font-size:clamp(1.5rem, 5vw, 3rem); margin:0; line-height:1; color:white; text-shadow:0 3px 0 rgba(0,0,0,0.2);">${Utils.escapeHtml(test ? test.title : 'Details')}</h1>
@@ -136,7 +136,7 @@
                        <div class="leaderboard-row slide-in" style="${meStyle} animation-delay:${i * 0.05}s;">
                          <div style="display:flex; justify-content:center;">${rankBadge}</div>
                          <div style="display:flex; align-items:center; gap:15px; overflow:hidden;">
-                           <div class="avatar" style="width:40px; height:40px; font-size:1.2rem; background:${isMe ? 'var(--blue)' : '#f0f0f0'}; color:${isMe ? 'white' : '#555'}; border:none; box-shadow:none;">
+                           <div class="avatar" style="width:40px; height:40px; font-size:1.2rem; flex-shrink:0; background:${isMe ? 'var(--blue)' : '#f0f0f0'}; color:${isMe ? 'white' : '#555'}; border:none; box-shadow:none;">
                              ${r.userName.charAt(0).toUpperCase()}
                            </div>
                            <div style="display:flex; flex-direction:column; overflow:hidden;">

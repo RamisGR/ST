@@ -275,6 +275,51 @@
       border-radius: 3px;
       transition: width 0.3s linear;
     }
+
+    /* === Mobile overrides (Bugs 4,5,9,10) === */
+    @media (max-width: 768px) {
+      .rating-screen {
+        padding: 15px 12px 12px;
+      }
+
+      .rating-hbar-label {
+        width: 70px;
+        font-size: 0.72rem;
+        white-space: normal;
+        line-height: 1.2;
+      }
+
+      .rating-hbar-track {
+        height: 32px;
+      }
+
+      .rating-bars-vertical {
+        height: 200px;
+        gap: 8px;
+      }
+
+      .rating-bar-label {
+        font-size: 0.72rem;
+      }
+
+      .teacher-dashboard {
+        padding: 15px 10px;
+        overflow-x: auto;
+      }
+
+      .stats-table th:nth-child(3),
+      .stats-table td:nth-child(3),
+      .stats-table th:nth-child(6),
+      .stats-table td:nth-child(6) {
+        display: none;
+      }
+
+      .podium-rank-1-avatar {
+        width: 70px !important;
+        height: 70px !important;
+        font-size: 1.8rem !important;
+      }
+    }
   </style>
 </head>
 
@@ -533,7 +578,7 @@
 
              <div class="pin-card">
                <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">Game PIN</div>
-               <div style="font-size:5rem; font-weight:900; letter-spacing:8px; line-height:1; font-family:var(--font-display);">${roomCode}</div>
+                <div style="font-size:clamp(2.2rem,13vw,5rem); font-weight:900; letter-spacing:clamp(3px,2vw,8px); line-height:1; font-family:var(--font-display);">${roomCode}</div>
 
                <div style="margin-top:22px; display:flex; flex-direction:column; align-items:center; gap:12px;">
                  <img src="${qrSrc}" alt="QR" style="width:min(420px,80vw); height:min(420px,80vw); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.22); display:block;">
@@ -780,7 +825,7 @@
 
             <div style="margin-top:30px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
               <a href="leaderboard.html?test=${battle.testId}" class="btn btn-primary" style="padding:15px 30px;">View Leaderboard</a>
-              <a href="tests.html" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.3); padding:15px 30px;">Back to Menu</a>
+              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:15px 30px;">Back to Menu</a>
             </div>
           </div>
         `;
@@ -1097,17 +1142,17 @@
               ${p2 ? `
                 <div class="podium-bar pop-in" style="animation-delay:0.2s; max-width:140px;">
                    <div class="avatar" style="margin-bottom:15px; background:#C0C0C0; color:white; width:70px; height:70px; font-size:1.8rem;">${p2.name.charAt(0)}</div>
-                   <div class="podium-rank-2" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2);">2</div>
+                   <div class="podium-rank-2" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#D8D8D8,#9A9A9A); height:140px;">2</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p2.name)}</div>
                    <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.correctCount} pts</div>
                 </div>
               ` : ''}
 
               <div class="podium-bar pop-in" style="max-width:160px; z-index:10;">
-                 <div class="avatar" style="margin-bottom:15px; background:var(--yellow); color:white; width:100px; height:100px; font-size:3rem; border:6px solid white; box-shadow:0 0 30px rgba(255,215,0,0.6);">
+                 <div class="avatar podium-rank-1-avatar" style="margin-bottom:15px; background:var(--yellow); color:white; width:100px; height:100px; font-size:3rem; border:6px solid white; box-shadow:0 0 30px rgba(255,215,0,0.6);">
                     ${p1.name.charAt(0)}
                  </div>
-                 <div class="podium-rank-1" style="width:100%; border-radius:15px 15px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; font-weight:900; font-size:4rem; color:white; box-shadow:0 8px 0 rgba(0,0,0,0.2);">1</div>
+                 <div class="podium-rank-1" style="width:100%; border-radius:15px 15px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; font-weight:900; font-size:4rem; color:white; box-shadow:0 8px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#FFD700,#C68C00); height:180px;">1</div>
                  <div style="background:white; color:#333; width:100%; padding:15px 5px; font-weight:900; border-radius:0 0 8px 8px; font-size:1.4rem; margin-top:4px;">${Utils.escapeHtml(p1.name)}</div>
                  <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.correctCount} pts</div>
               </div>
@@ -1115,7 +1160,7 @@
               ${p3 ? `
                 <div class="podium-bar pop-in" style="animation-delay:0.4s; max-width:140px;">
                    <div class="avatar" style="margin-bottom:15px; background:#CD7F32; color:white; width:70px; height:70px; font-size:1.8rem;">${p3.name.charAt(0)}</div>
-                   <div class="podium-rank-3" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2);">3</div>
+                   <div class="podium-rank-3" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#E0A060,#B06828); height:110px;">3</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p3.name)}</div>
                    <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.correctCount} pts</div>
                 </div>

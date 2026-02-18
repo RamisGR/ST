@@ -501,6 +501,42 @@ label {
     padding: 25px;
     font-size: 1.4rem;
   }
+
+  /* Bug 1,12: PIN card — no rotation, responsive sizing */
+  .pin-card {
+    transform: none;
+    padding: 10px 16px;
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    box-sizing: border-box;
+  }
+
+  /* Bug 6: Rating vertical chart — tighter gap on mobile */
+  .rating-bars-vertical {
+    height: 220px;
+    gap: 8px;
+    padding-top: 40px;
+  }
+
+  .rating-bar-col {
+    max-width: none;
+  }
+
+  .rating-bar-fill .bar-count {
+    font-size: 0.85rem;
+  }
+
+  .rating-bar-label {
+    font-size: 0.72rem;
+  }
+
+  /* Bug 11: Leaderboard grid — narrower columns on small screens */
+  .leaderboard-row,
+  .leaderboard-header {
+    grid-template-columns: 50px 1fr 70px;
+    padding: 10px 12px;
+  }
 }
 
 /* GRID LAYOUTS FOR TESTS */
@@ -680,7 +716,7 @@ label {
   position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .img-preview img {
@@ -706,7 +742,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   transition: transform 0.1s;
 }
 
