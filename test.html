@@ -77,17 +77,18 @@
 
       function startTest() {
         startTime = Date.now();
-        const sessionId = Storage.generateId();
-        window._testSessionId = sessionId;
-        Storage.saveSession({
-          id: sessionId,
-          userName: user.name,
-          userGroup: user.group,
-          testId: test.id,
-          testTitle: test.title,
-          startedAt: startTime,
-        });
-
+        if (user.role !== 'admin') {
+          const sessionId = Storage.generateId();
+          window._testSessionId = sessionId;
+          Storage.saveSession({
+            id: sessionId,
+            userName: user.name,
+            userGroup: user.group || '',
+            testId: test.id,
+            testTitle: test.title,
+            startedAt: startTime,
+          });
+        }
         startTimer();
         renderQuestion();
       }
@@ -183,7 +184,7 @@
           testId: test.id,
           testTitle: test.title,
           userName: user.name,
-          userGroup: user.group,
+          userGroup: user.group || '',
           score,
           correctCount,
           totalQuestions: test.questions.length,
@@ -222,8 +223,11 @@
                 </div>
               </div>
 
-              <a href="leaderboard.html?test=${test.id}" class="btn btn-primary btn-block" style="margin-bottom:15px; font-size:1.2rem; padding:18px;">View Leaderboard</a>
-              <a href="tests.html" class="btn btn-outline btn-block" style="border:2px solid #ddd; color:#888;">Back to Lobby</a>
+              ${user.role === 'admin'
+                ? `<a href="admin.html" class="btn btn-primary btn-block" style="margin-bottom:15px; font-size:1.2rem; padding:18px;">&#8592; Назад в панель</a>`
+                : `<a href="leaderboard.html?test=${test.id}" class="btn btn-primary btn-block" style="margin-bottom:15px; font-size:1.2rem; padding:18px;">View Leaderboard</a>
+              <a href="tests.html" class="btn btn-outline btn-block" style="border:2px solid #ddd; color:#888;">Back to Lobby</a>`
+              }
             </div>
           </div>
         `;

@@ -69,6 +69,37 @@
       gap: 10px;
       margin-bottom: 10px;
     }
+
+    /* Two-column image upload zone */
+    .img-drop-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 2px dashed #ccc;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: #f8f8ff;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .img-upload-zone.drag-over .img-drop-grid {
+      border-color: var(--blue);
+      background: rgba(19,104,206,0.05);
+    }
+    .img-drop-half {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 18px 12px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: #888;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      gap: 4px;
+    }
+    .img-drop-half:hover { background: rgba(19,104,206,0.07); color: var(--blue); }
+    .img-drop-half--left { border-right: 1px dashed #ddd; }
   </style>
 </head>
 
@@ -170,7 +201,7 @@
           const correctPass = localStorage.getItem('ct_admin_password') || 'admin';
 
           if (pass === correctPass) {
-            user = { name, role: 'admin' };
+            user = { name, role: 'admin', group: '' };
             Storage.setUser(user);
             initAdmin(user);
           } else {
@@ -206,7 +237,7 @@
             </div>
             <div style="font-weight: 700; font-size: 0.9rem; display:flex; align-items:center; gap:15px;">
               <span>${Utils.escapeHtml(user.name)}</span>
-              <button onclick="Storage.logout()" class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.3); padding:5px 15px; font-size:0.8rem;">LOGOUT</button>
+              <button onclick="Storage.logout()" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.15); padding:5px 15px; font-size:0.8rem;">LOGOUT</button>
             </div>
           </div>
         `;
@@ -423,16 +454,19 @@
               </div>
             </div>
 
-            <h2 style="margin:40px 0 20px; color:#333; display:flex; justify-content:space-between; align-items:center;">
-              <span>Questions (${t.questions.length})</span>
-              <button onclick="addQuestion()" class="btn btn-success" style="padding:8px 15px; font-size:0.9rem;">+ Add Question</button>
+            <h2 style="margin:40px 0 20px; color:#333;">
+              Questions (${t.questions.length})
             </h2>
 
             <div id="questionsList">
               ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:40px; padding-top: 20px; border-top: 2px solid #eee;">
+            <div style="text-align:center; margin:24px 0 8px;">
+              <button onclick="addQuestion()" class="btn btn-success" style="padding:12px 30px; font-size:1rem;">+ Add Question</button>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee;">
                <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">Discard</button>
                <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">Save Challenge</button>
             </div>
@@ -465,15 +499,25 @@
               </div>
             </div>
           ` : `
-            <div id="imgZone_${qi}" class="img-upload-zone">
-              <div class="img-drop-area"
-                   onclick="document.getElementById('imgFileInput_${qi}').click()"
-                   ondragover="event.preventDefault(); this.classList.add('drag-over')"
-                   ondragleave="this.classList.remove('drag-over')"
-                   ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleImgDrop(event, ${qi})">
-                <span class="img-drop-icon">&#x1F5BC;</span>
-                <strong style="display:block;">Add Image (optional)</strong>
-                <span class="img-drop-hint">Click or drag &amp; drop &middot; PNG, JPG, GIF, WebP</span>
+            <div id="imgZone_${qi}" class="img-upload-zone"
+                 ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                 ondragleave="this.classList.remove('drag-over')"
+                 ondrop="event.preventDefault(); this.classList.remove('drag-over'); handleImgDrop(event, ${qi})">
+              <div class="img-drop-grid">
+                <div class="img-drop-half img-drop-half--left"
+                     onclick="document.getElementById('imgFileInput_${qi}').click()"
+                     onmouseenter="window._lastActiveImgZone=${qi}">
+                  <span class="img-drop-icon">&#x1F5BC;</span>
+                  <strong>Выбрать файл</strong>
+                  <span class="img-drop-hint">Нажмите или перетащите &middot; PNG, JPG, GIF, WebP</span>
+                </div>
+                <div class="img-drop-half img-drop-half--right"
+                     onclick="handleClipboardPaste(${qi})"
+                     onmouseenter="window._lastActiveImgZone=${qi}">
+                  <span class="img-drop-icon">&#x1F4CB;</span>
+                  <strong>Вставить</strong>
+                  <span class="img-drop-hint">Нажмите или Ctrl+V</span>
+                </div>
               </div>
               <input type="file" accept="image/*" id="imgFileInput_${qi}" style="display:none" onchange="handleImgUpload(this, ${qi})">
             </div>
@@ -710,6 +754,28 @@
         if (window._rerenderEditor) window._rerenderEditor();
       };
 
+      window.handleClipboardPaste = async function (qi) {
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.read) {
+            Utils.showNotification('Используйте Ctrl+V в зоне загрузки', 'warning');
+            return;
+          }
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imageType = item.types.find(t => t.startsWith('image/'));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              const file = new File([blob], 'clipboard.png', { type: imageType });
+              await window.handleImgUpload({ files: [file] }, qi);
+              return;
+            }
+          }
+          Utils.showNotification('Изображение в буфере не найдено', 'error');
+        } catch (e) {
+          Utils.showNotification('Нет доступа к буферу. Попробуйте Ctrl+V.', 'error');
+        }
+      };
+
       window.handleImgDrop = function (event, qi) {
         const file = event.dataTransfer.files[0];
         if (!file || !file.type.startsWith('image/')) {
@@ -814,6 +880,17 @@
       function _isValidAnswer(val) {
         return /^[ABCD1234]$/i.test(val.trim());
       }
+
+      // Global Ctrl+V paste listener — inserts clipboard image into the last hovered question zone
+      document.addEventListener('paste', function (e) {
+        const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
+        if (!item) return;
+        const zones = document.querySelectorAll('[id^="imgZone_"]');
+        if (!zones.length) return;
+        const qi = parseInt(window._lastActiveImgZone != null ? window._lastActiveImgZone : 0);
+        const file = item.getAsFile();
+        if (file && window.handleImgUpload) window.handleImgUpload({ files: [file] }, qi);
+      });
     })();
   </script>
 </body>
