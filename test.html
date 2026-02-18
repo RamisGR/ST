@@ -126,8 +126,13 @@
               <button onclick="finishTest()" class="btn btn-outline" style="padding:8px 20px; font-size:0.9rem; border-width:2px; height:auto; border-bottom-width:4px;">Quit</button>
             </div>
 
-            <div class="question-card">
-              ${Utils.escapeHtml(q.text)}
+            <div class="question-card ${q.imageUrl ? 'question-card--with-img' : ''}">
+              ${q.imageUrl ? `
+                <div class="question-image-wrap">
+                  <img src="${Utils.escapeHtml(q.imageUrl)}" class="question-image" alt="Question image" onerror="this.parentElement.style.display='none'">
+                </div>
+                <div class="question-card__text">${Utils.escapeHtml(q.text)}</div>
+              ` : Utils.escapeHtml(q.text)}
             </div>
 
             <div class="answer-grid">
@@ -187,7 +192,9 @@
           completedAt: Date.now(),
         };
 
-        Storage.saveResult(result);
+        if (user.role !== 'admin') {
+          Storage.saveResult(result);
+        }
         showResults(result);
       }
 
