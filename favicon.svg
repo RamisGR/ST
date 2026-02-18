@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Orange left D-shape (semicircle, flat side right) -->
+  <path d="M 44,5 A 44,44 0 0,0 44,95 Z" fill="#F7941D"/>
+  <!-- Black downward-pointing triangle, overlapping slightly -->
+  <polygon points="47,5 97,5 72,95" fill="#111111"/>
+</svg>
