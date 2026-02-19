@@ -32,6 +32,7 @@
   <script src="js/sample-tests.js"></script>
   <script src="js/i18n.js?v=2"></script>
   <script src="js/storage.js"></script>
+  <script src="js/analytics.js"></script>
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
@@ -39,6 +40,7 @@
       const user = Utils.requireAuth();
       if (!user) return;
 
+      let currentFolderId = "__all__";
       render();
 
       function render() {
@@ -60,7 +62,9 @@
           </header>
         `;
 
-        const tests = Storage.getTests();
+        const allTests = Storage.getTests();
+        const folders = Storage.getFolders();
+        const tests = Storage.getTestsInFolder(currentFolderId);
         const userResults = Storage.getUserResults(user.name);
         const completedTestIds = new Set(userResults.map(r => r.testId));
 
@@ -77,6 +81,13 @@
                 <span class="shape-icon shape-triangle" style="background:#333; width:20px; height:20px; vertical-align:middle; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right:10px;"></span>
                 ${t('battle_mode')}
               </a>
+            </div>
+
+
+            <div class="folder-pills">
+              <button class="folder-pill ${currentFolderId === '__all__' ? 'active' : ''}" onclick="setFolderFilter('__all__')">${t('folder_all')}</button>
+              <button class="folder-pill ${currentFolderId === '__unfiled__' ? 'active' : ''}" onclick="setFolderFilter('__unfiled__')">${t('folder_unfiled')}</button>
+              ${folders.map(f => `<button class="folder-pill ${currentFolderId === f.id ? 'active' : ''}" onclick="setFolderFilter('${f.id}')" style="border-left-color:${f.color};">${Utils.escapeHtml(f.name)}</button>`).join('')}
             </div>
 
             ${tests.length === 0 ? `
@@ -129,6 +140,7 @@
         `;
       }
 
+      window.setFolderFilter = function (folderId) { currentFolderId = folderId; render(); };
       window.startTest = function (testId) { window.location.href = `test.html?id=${testId}`; };
     })();
   </script>

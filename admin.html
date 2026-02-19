@@ -136,6 +136,7 @@
   <script src="js/sample-tests.js"></script>
   <script src="js/i18n.js?v=2"></script>
   <script src="js/storage.js"></script>
+  <script src="js/analytics.js"></script>
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
@@ -233,6 +234,10 @@
       function initAdmin(user) {
         let currentTab = 'tests';
         let editingTest = null;
+        let currentFolderId = '__all__';
+        let currentAnalyticsTab = 'overview';
+        let currentAnalyticsFolder = '__all__';
+        let studentFilter = 'all';
 
         function render() {
           // Custom Header for Admin
@@ -258,6 +263,7 @@
                 ${editingTest ? t('tab_edit') : t('tab_create')}
               </button>
               <button class="tab-btn ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">${t('tab_results')}</button>
+              <button class="tab-btn ${currentTab === 'analytics' ? 'active' : ''}" onclick="switchTab('analytics')">${t('tab_analytics')}</button>
               <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">${t('tab_settings')}</button>
             </nav>
 
@@ -269,6 +275,7 @@
             case 'tests': renderTestsList(); break;
             case 'editor': renderEditor(); break;
             case 'results': renderResults(); break;
+            case 'analytics': renderAnalytics(); break;
             case 'settings': renderSettings(); break;
           }
         }
@@ -284,6 +291,10 @@
         // ——— Tests List ———
         function renderTestsList() {
           const tests = Storage.getTests();
+          const folders = Storage.getFolders().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+          const visibleTests = Storage.getTestsInFolder(currentFolderId);
+          const folderCount = (folderId) => Storage.getTestsInFolder(folderId).length;
+
           document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:10px;">
             <p style="color:#666; font-weight:700;">${t('total_challenges')}: ${tests.length}</p>
@@ -292,41 +303,94 @@
                 &#x1F4CA; ${t('import_excel')}
               </button>
               <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFromExcel(this)">
+              <button onclick="createFolderPrompt()" class="btn btn-outline" style="padding:10px 16px;">+ ${t('create_folder')}</button>
               <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">${t('new_challenge')}</button>
             </div>
           </div>
-          ${tests.length === 0 ? `
-            <div class="empty-state card" style="text-align:center; padding:50px;">
-              <div style="font-size:4rem; margin-bottom:10px;">📭</div>
-              <p style="font-size:1.5rem; font-weight:700; color:#555;">${t('no_challenges_found')}</p>
-              <p style="color:#888;">${t('create_first')}</p>
+
+          <div style="display:grid; grid-template-columns:220px 1fr; gap:18px; align-items:start;">
+            <div class="folder-sidebar">
+              <div class="folder-item ${currentFolderId === '__all__' ? 'active' : ''}" onclick="setAdminFolder('__all__')"><span>${t('folder_all')}</span><span class="folder-count">${tests.length}</span></div>
+              <div class="folder-item ${currentFolderId === '__unfiled__' ? 'active' : ''}" onclick="setAdminFolder('__unfiled__')"><span>${t('folder_unfiled')}</span><span class="folder-count">${folderCount('__unfiled__')}</span></div>
+              <hr style="border:none; border-top:1px solid #eee; margin:10px 0;">
+              ${folders.map(folder => `
+                <div class="folder-item ${currentFolderId === folder.id ? 'active' : ''}" onclick="setAdminFolder('${folder.id}')">
+                  <span><span class="folder-color-dot" style="background:${folder.color};"></span>${Utils.escapeHtml(folder.name)}</span>
+                  <span class="folder-count">${folderCount(folder.id)}</span>
+                </div>
+              `).join('')}
             </div>
-          ` : `
-            <div style="display:grid; gap:20px;">
-              ${tests.map(test => {
-            const results = Storage.getResultsForTest(test.id);
-            return `
-                  <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; padding:20px;">
-                    <div>
-                      <h3 style="margin:0 0 5px 0; font-size:1.3rem; color:#333;">${Utils.escapeHtml(test.title)}</h3>
-                      <div style="font-size:0.9rem; color:#888; font-weight:600;">
-                        ${test.questions.length} ${t('questions')} • ${Utils.formatTime(test.timeLimit)} • ${results.length} ${t('attempts')}
+
+            <div>
+            ${visibleTests.length === 0 ? `
+              <div class="empty-state card" style="text-align:center; padding:50px;">
+                <div style="font-size:4rem; margin-bottom:10px;">📭</div>
+                <p style="font-size:1.5rem; font-weight:700; color:#555;">${t('no_challenges_found')}</p>
+              </div>
+            ` : `
+              <div style="display:grid; gap:20px;">
+                ${visibleTests.map(test => {
+                  const results = Storage.getResultsForTest(test.id);
+                  return `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; padding:20px;">
+                      <div>
+                        <h3 style="margin:0 0 5px 0; font-size:1.3rem; color:#333;">${Utils.escapeHtml(test.title)}</h3>
+                        <div style="font-size:0.9rem; color:#888; font-weight:600;">
+                          ${test.questions.length} ${t('questions')} • ${Utils.formatTime(test.timeLimit)} • ${results.length} ${t('attempts')}
+                        </div>
+                      </div>
+                      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <select onchange="moveTestFolder('${test.id}', this.value)" class="form-control" style="width:auto; min-width:180px; padding:8px 10px;">
+                          <option value="">${t('move_to_folder')}</option>
+                          <option value="__unfiled__">${t('folder_unfiled')}</option>
+                          ${folders.map(f => `<option value="${f.id}" ${test.folderId === f.id ? 'selected' : ''}>${Utils.escapeHtml(f.name)}</option>`).join('')}
+                        </select>
+                        <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; ${t('preview')}</button>
+                        <button onclick="shareTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#eef2ff; border-color:#6366f1; color:#4338ca;">&#x1F517; ${t('share')}</button>
+                        <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; ${t('battle')}</button>
+                        <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">${t('edit')}</button>
+                        <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\'")}')" class="btn btn-danger" style="padding: 8px 15px;">${t('delete')}</button>
                       </div>
                     </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                      <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; ${t('preview')}</button>
-                      <button onclick="shareTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#eef2ff; border-color:#6366f1; color:#4338ca;">&#x1F517; ${t('share')}</button>
-                      <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; ${t('battle')}</button>
-                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">${t('edit')}</button>
-                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">${t('delete')}</button>
-                    </div>
-                  </div>
-                `;
-          }).join('')}
+                  `;
+                }).join('')}
+              </div>
+            `}
             </div>
-          `}
+          </div>
         `;
         }
+
+        window.setAdminFolder = function (folderId) { currentFolderId = folderId; renderTestsList(); };
+        window.moveTestFolder = function (testId, folderId) {
+          Storage.moveTestToFolder(testId, folderId === '__unfiled__' ? null : folderId);
+          renderTestsList();
+        };
+        window.createFolderPrompt = function () {
+          const name = prompt(t('folder_name'));
+          if (!name) return;
+          const colors = ['#1368CE', '#0FA958', '#C56CD6', '#E67E22', '#D1495B', '#2D9CDB'];
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          Storage.saveFolder({ name: name.trim(), color, createdBy: user.name, sortOrder: Storage.getFolders().length });
+          renderTestsList();
+        };
+        window.setAnalyticsTab = function (tab) { currentAnalyticsTab = tab; renderAnalytics(); };
+        window.setAnalyticsFolder = function (folderId) { currentAnalyticsFolder = folderId; renderAnalytics(); };
+        window.setStudentFilter = function (value) { studentFilter = value; renderAnalytics(); };
+        window.exportStudentsCsv = function () {
+          const scopedResults = currentAnalyticsFolder === '__all__' ? Storage.getResults() : Analytics.getResultsForFolder(currentAnalyticsFolder);
+          const grouped = {};
+          scopedResults.forEach(r => { grouped[r.userName] = grouped[r.userName] || []; grouped[r.userName].push(r); });
+          const rows = [['name','attempts','avgScore']];
+          Object.entries(grouped).forEach(([name, arr]) => rows.push([name, arr.length, Math.round(arr.reduce((s,r)=>s+(r.score||0),0)/arr.length)]));
+          const csv = rows.map(r => r.join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'analytics_students.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        };
 
         window.previewTest = function (testId) {
           window.open('test.html?id=' + testId, '_blank');
@@ -423,6 +487,13 @@
             <div class="form-group">
               <label>${t('time_limit_classic')}</label>
               <input type="number" id="testTime" class="form-control" value="${te.timeLimit}" min="30" max="7200" style="max-width:150px;">
+            </div>
+            <div class="form-group">
+              <label>${t('folders')}</label>
+              <select id="testFolder" class="form-control" style="max-width:300px;">
+                <option value="">${t('folder_unfiled')}</option>
+                ${Storage.getFolders().map(f => `<option value="${f.id}" ${(te.folderId === f.id) ? 'selected' : ''}>${Utils.escapeHtml(f.name)}</option>`).join('')}
+              </select>
             </div>
 
             <!-- Battle Settings -->
@@ -699,6 +770,107 @@
             render();
           });
         };
+
+        function renderAnalytics() {
+          const folders = Storage.getFolders();
+          const folderOptions = [{ id: '__all__', name: t('folder_all') }, { id: '__unfiled__', name: t('folder_unfiled') }, ...folders.map(f => ({ id: f.id, name: f.name }))];
+          const scopedResults = currentAnalyticsFolder === '__all__' ? Storage.getResults() : Analytics.getResultsForFolder(currentAnalyticsFolder);
+          const stats = currentAnalyticsFolder === '__all__'
+            ? {
+              testCount: Storage.getTests().length,
+              resultCount: scopedResults.length,
+              uniqueStudents: new Set(scopedResults.map(r => r.userName)).size,
+              avgScore: scopedResults.length ? Math.round(scopedResults.reduce((s, r) => s + (r.score || 0), 0) / scopedResults.length) : 0,
+            }
+            : Analytics.getFolderStats(currentAnalyticsFolder);
+          const dist = Analytics.getScoreDistribution(scopedResults);
+
+          const grouped = {};
+          scopedResults.forEach(r => {
+            grouped[r.userName] = grouped[r.userName] || [];
+            grouped[r.userName].push(r);
+          });
+          let students = Object.entries(grouped).map(([name, items]) => ({
+            userName: name,
+            attempts: items.length,
+            avgScore: Math.round(items.reduce((s, r) => s + (r.score || 0), 0) / items.length),
+            trend: Analytics.computeTrend(items),
+            lastAt: Math.max(...items.map(i => i.completedAt || 0)),
+          }));
+          if (studentFilter === 'struggling') students = students.filter(s => s.avgScore < 50);
+          if (studentFilter === 'top') students = students.filter(s => s.avgScore >= 80);
+          students.sort((a,b)=>b.avgScore-a.avgScore);
+
+          const hardQuestions = Analytics.getHardQuestions(currentAnalyticsFolder === '__all__' ? undefined : currentAnalyticsFolder).slice(0, 30);
+          const battles = Storage.getBattleResults().filter(b => currentAnalyticsFolder === '__all__' || (currentAnalyticsFolder === '__unfiled__' ? !b.folderId : b.folderId === currentAnalyticsFolder));
+
+          document.getElementById('tabContent').innerHTML = `
+            <div class="card" style="margin-bottom:16px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="analytics-nav">
+                  <button class="analytics-pill ${currentAnalyticsTab==='overview'?'active':''}" onclick="setAnalyticsTab('overview')">${t('analytics_overview')}</button>
+                  <button class="analytics-pill ${currentAnalyticsTab==='students'?'active':''}" onclick="setAnalyticsTab('students')">${t('analytics_students')}</button>
+                  <button class="analytics-pill ${currentAnalyticsTab==='questions'?'active':''}" onclick="setAnalyticsTab('questions')">${t('analytics_questions')}</button>
+                  <button class="analytics-pill ${currentAnalyticsTab==='battles'?'active':''}" onclick="setAnalyticsTab('battles')">${t('analytics_battles')}</button>
+                </div>
+                <select class="form-control" onchange="setAnalyticsFolder(this.value)" style="max-width:260px;">
+                  ${folderOptions.map(f => `<option value="${f.id}" ${currentAnalyticsFolder===f.id?'selected':''}>${Utils.escapeHtml(f.name)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            ${currentAnalyticsTab === 'overview' ? `
+              <div style="display:grid; grid-template-columns:repeat(4, minmax(130px,1fr)); gap:12px; margin-bottom:16px;">
+                <div class="stat-card"><div class="stat-card-value">${stats.uniqueStudents}</div><div class="stat-card-label">${t('unique_students')}</div></div>
+                <div class="stat-card"><div class="stat-card-value">${stats.testCount}</div><div class="stat-card-label">${t('tab_challenges')}</div></div>
+                <div class="stat-card"><div class="stat-card-value">${stats.resultCount}</div><div class="stat-card-label">${t('total_attempts')}</div></div>
+                <div class="stat-card"><div class="stat-card-value">${stats.avgScore}%</div><div class="stat-card-label">${t('avg_score')}</div></div>
+              </div>
+              <div class="card">
+                <h3 style="margin-top:0;">${t('score')}</h3>
+                ${dist.map(d => `<div class="bar-chart-row"><div>${d.range}</div><div class="bar-chart-track"><div class="bar-chart-fill" style="width:${scopedResults.length ? (d.count/scopedResults.length*100) : 0}%;"></div></div><div>${d.count}</div></div>`).join('')}
+              </div>
+            ` : ''}
+
+            ${currentAnalyticsTab === 'students' ? `
+              <div class="card">
+                <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+                  <div>
+                    <button class="btn btn-outline" onclick="setStudentFilter('all')">${t('filter_all')}</button>
+                    <button class="btn btn-outline" onclick="setStudentFilter('struggling')">${t('filter_struggling')}</button>
+                    <button class="btn btn-outline" onclick="setStudentFilter('top')">${t('filter_top')}</button>
+                  </div>
+                  <button class="btn btn-outline" onclick="exportStudentsCsv()">${t('export_csv')}</button>
+                </div>
+                <table style="width:100%; border-collapse:collapse;">
+                  <thead><tr><th style="text-align:left;">${t('player')}</th><th>${t('attempts')}</th><th>${t('avg_score')}</th><th>${t('progress_over_time')}</th><th>${t('date')}</th></tr></thead>
+                  <tbody>
+                    ${students.map(s => `<tr class="student-row"><td>${Utils.escapeHtml(s.userName)}</td><td style="text-align:center;">${s.attempts}</td><td style="text-align:center;">${s.avgScore}%</td><td style="text-align:center;"><span class="trend-badge trend-${s.trend}">${t('trend_' + s.trend)}</span></td><td style="text-align:right;">${s.lastAt ? new Date(s.lastAt).toLocaleDateString() : '-'}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : ''}
+
+            ${currentAnalyticsTab === 'questions' ? `
+              <div class="card">
+                <h3 style="margin-top:0;">${t('hard_questions')}</h3>
+                ${hardQuestions.map(q => `<div style="border-bottom:1px solid #f0f0f0; padding:8px 0;"><div style="font-weight:700;">${Utils.escapeHtml(q.testTitle)} / ${Utils.escapeHtml(String(q.questionId))}</div><div class="bar-chart-row"><div>${t('error_rate')}</div><div class="bar-chart-track"><div class="bar-chart-fill" style="width:${q.errorRate}%;"></div></div><div>${q.errorRate}%</div></div></div>`).join('')}
+              </div>
+            ` : ''}
+
+            ${currentAnalyticsTab === 'battles' ? `
+              <div class="card">
+                <h3 style="margin-top:0;">${t('battle_history')}</h3>
+                ${battles.length === 0 ? `<p>${t('no_battle_history')}</p>` : battles.sort((a,b)=>(b.finishedAt||0)-(a.finishedAt||0)).map(b => `
+                  <details style="margin-bottom:10px;"><summary style="cursor:pointer; font-weight:800;">${Utils.escapeHtml(b.testTitle)} · ${b.roomCode} · ${b.playerCount} ${t('participants')}</summary>
+                  <div style="padding:8px 0; color:#666;">${new Date(b.finishedAt || b.startedAt || Date.now()).toLocaleString()}</div>
+                  <div style="display:grid; gap:6px;">${(b.players||[]).map(p => `<div>${Utils.escapeHtml(p.name)} — ${p.score}%</div>`).join('')}</div>
+                  </details>
+                `).join('')}
+              </div>
+            ` : ''}
+          `;
+        }
 
         // ——— Settings ———
         function renderSettings() {

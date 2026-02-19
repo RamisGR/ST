@@ -629,6 +629,7 @@
             return;
           }
           if (data.status === 'finished') {
+            if (isCreator) saveBattleResultSnapshot();
             if (isObserver) {
               showTeacherResults(roomCode);
             } else {
@@ -914,8 +915,85 @@
         }
       }
 
+
+      function saveBattleResultSnapshot() {
+        if (!battle || !battle.players || battle._resultSaved) return;
+        testData = testData || Storage.getTest(battle.testId);
+        const questions = (testData && testData.questions) || [];
+        const players = Object.values(battle.players || {});
+        const ranked = [...players].sort((a, b) => {
+          if ((b.correctCount || 0) !== (a.correctCount || 0)) return (b.correctCount || 0) - (a.correctCount || 0);
+          return (a.timeSpent || 0) - (b.timeSpent || 0);
+        });
+
+        const playersSnapshot = ranked.map((p, idx) => {
+          const totalQuestions = questions.length || (battle.questionsCount || 0);
+          const score = totalQuestions > 0 ? Math.round(((p.correctCount || 0) / totalQuestions) * 100) : 0;
+          const answerMap = p.answers || {};
+          const answers = Object.keys(answerMap).map(qi => {
+            const qIndex = Number(qi);
+            const selected = answerMap[qi];
+            const q = questions[qIndex];
+            return {
+              questionId: q ? q.id : String(qIndex),
+              selected,
+              correct: q ? q.correct : null,
+              isCorrect: q ? selected === q.correct : false,
+            };
+          });
+          return {
+            name: p.name,
+            group: p.group || '',
+            correctCount: p.correctCount || 0,
+            totalQuestions,
+            score,
+            timeSpent: p.timeSpent || 0,
+            rank: idx + 1,
+            answers,
+          };
+        });
+
+        const questionStats = questions.map((q, qIndex) => {
+          let correctCount = 0;
+          let wrongCount = 0;
+          players.forEach((p) => {
+            const ans = p.answers ? p.answers[qIndex] : undefined;
+            if (ans === undefined || ans === null || ans === -1) return;
+            if (ans === q.correct) correctCount += 1;
+            else wrongCount += 1;
+          });
+          const total = correctCount + wrongCount;
+          return {
+            questionIndex: qIndex,
+            questionText: q.text,
+            correctAnswer: q.correct,
+            correctCount,
+            wrongCount,
+            errorRate: total > 0 ? Math.round((wrongCount / total) * 100) : 0,
+          };
+        });
+
+        Storage.saveBattleResult({
+          id: 'br_' + battle.id,
+          roomCode: battle.id,
+          testId: battle.testId,
+          testTitle: battle.testTitle,
+          folderId: testData ? (testData.folderId || null) : null,
+          createdBy: battle.createdBy,
+          startedAt: battle.startedAt || battle.createdAt,
+          finishedAt: Date.now(),
+          playerCount: playersSnapshot.length,
+          players: playersSnapshot,
+          questionStats,
+        });
+
+        battle._resultSaved = true;
+        Storage.updateBattleState(battle.id, { _resultSaved: true });
+      }
+
       function showTeacherResults(roomCode) {
         if (!battle || !battle.players) return;
+        saveBattleResultSnapshot();
         testData = testData || Storage.getTest(battle.testId);
         const players = Object.values(battle.players).sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0));
         const totalQ = testData ? testData.questions.length : (battle.questionsCount || 0);
@@ -1280,6 +1358,7 @@
 
         // Host checks if all finished
         const isCreator = localStorage.getItem('battle_is_creator') === 'true';
+        if (isCreator && battle && battle.status === 'finished') saveBattleResultSnapshot();
         if (isCreator) {
           const checkAll = setInterval(() => {
             if (!battle || !battle.players) return;
