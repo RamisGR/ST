@@ -118,14 +118,31 @@
     </div>
   </div>
 
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
+    // Set page lang attribute
+    document.documentElement.lang = getLang();
+
     // Check if logged in
     const user = Storage.getUser();
     if (user) {
       window.location.href = 'tests.html';
     }
+
+    // Render i18n strings
+    document.querySelector('.login-card > div').textContent = t('player_login');
+    document.getElementById('username').placeholder = t('your_nickname');
+    document.getElementById('group').placeholder = t('group_optional');
+    document.querySelector('button[type="submit"]').textContent = t('enter_lobby');
+    document.querySelector('a[href="admin.html"]').textContent = t('teacher_console');
+
+    // Inject lang switcher
+    const langBtnContainer = document.createElement('div');
+    langBtnContainer.style.cssText = 'position:fixed; top:15px; right:15px; z-index:100;';
+    langBtnContainer.innerHTML = renderLangSwitcher();
+    document.body.appendChild(langBtnContainer);
 
     document.getElementById('loginForm').addEventListener('submit', function (e) {
       e.preventDefault();

@@ -332,6 +332,7 @@
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
@@ -384,50 +385,50 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; max-width:900px; padding-top:40px;">
-            <h1 style="font-size:clamp(3rem, 6vw, 4.5rem); margin-bottom:10px; text-shadow:none; color:white; line-height:1;">BATTLE MODE</h1>
-            <p style="font-size:1.5rem; color:rgba(255,255,255,0.9); margin-bottom:50px; font-weight:700;">Compete live with your classmates!</p>
+            <h1 style="font-size:clamp(3rem, 6vw, 4.5rem); margin-bottom:10px; text-shadow:none; color:white; line-height:1;">${t('battle_title')}</h1>
+            <p style="font-size:1.5rem; color:rgba(255,255,255,0.9); margin-bottom:50px; font-weight:700;">${t('compete_live')}</p>
 
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:30px; margin-bottom:40px;">
               <div class="card" style="border-top:12px solid var(--blue); text-align:left;">
-                <h2 style="color:#222; font-size:2rem; margin-bottom:20px;">Host Game</h2>
+                <h2 style="color:#222; font-size:2rem; margin-bottom:20px;">${t('host_game')}</h2>
                 <div class="form-group">
-                  <label>Select Challenge</label>
+                  <label>${t('select_challenge')}</label>
                   <select id="testSelect" class="form-control">
                     ${tests.map(t => `<option value="${t.id}">${Utils.escapeHtml(t.title)}</option>`).join('')}
                   </select>
                 </div>
                 ${!user ? `
                   <div class="form-group">
-                    <label>Your Name</label>
+                    <label>${t('your_name')}</label>
                     <input id="creatorName" class="form-control" placeholder="Prof. X">
                   </div>
                 ` : ''}
                 ${isAdmin ? `
                   <div class="participate-toggle">
                     <input type="checkbox" id="participateToggle">
-                    <label for="participateToggle">Participate in the game (play alongside students)</label>
+                    <label for="participateToggle">${t('participate_toggle')}</label>
                   </div>
                 ` : ''}
-                <button id="createBtn" class="btn btn-primary btn-block" style="font-size:1.2rem; padding:20px; margin-top:20px;">Create Room</button>
+                <button id="createBtn" class="btn btn-primary btn-block" style="font-size:1.2rem; padding:20px; margin-top:20px;">${t('create_room')}</button>
               </div>
 
               <div class="card" style="border-top:12px solid var(--green); text-align:left;">
-                <h2 style="color:#222; font-size:2rem; margin-bottom:20px;">Join Game</h2>
+                <h2 style="color:#222; font-size:2rem; margin-bottom:20px;">${t('join_game')}</h2>
                 <div class="form-group">
-                  <label>Room PIN</label>
+                  <label>${t('room_pin')}</label>
                   <input id="roomCode" class="form-control" placeholder="123456" maxlength="6" style="letter-spacing:5px; font-size:1.8rem; text-align:center; font-weight:700; font-family:var(--font-display);">
                 </div>
                 ${!user ? `
                   <div class="form-group">
-                    <label>Your Name</label>
+                    <label>${t('your_name')}</label>
                     <input id="joinName" class="form-control" placeholder="Player 1">
                   </div>
                 ` : ''}
-                <button id="joinBtn" class="btn btn-success btn-block" style="font-size:1.2rem; padding:20px;">Enter Room</button>
+                <button id="joinBtn" class="btn btn-success btn-block" style="font-size:1.2rem; padding:20px;">${t('enter_room')}</button>
               </div>
             </div>
             
-            <a href="tests.html" class="btn btn-outline" style="border:none; color:white; background:rgba(255,255,255,0.1);">Back to Menu</a>
+            <a href="tests.html" class="btn btn-outline" style="border:none; color:white; background:rgba(255,255,255,0.1);">${t('back_to_menu')}</a>
           </div>
         `;
 
@@ -441,7 +442,7 @@
         document.getElementById('createBtn').addEventListener('click', () => {
           const testId = document.getElementById('testSelect').value;
           const name = user ? user.name : document.getElementById('creatorName').value.trim();
-          if (!name) return alert('Name required');
+          if (!name) return alert(t('name_required'));
 
           if (!user) Storage.setUser({ name, role: 'student' });
 
@@ -476,7 +477,7 @@
         document.getElementById('joinBtn').addEventListener('click', () => {
           const code = document.getElementById('roomCode').value.trim().toUpperCase();
           const name = user ? user.name : document.getElementById('joinName').value.trim();
-          if (!code || !name) return alert('PIN and Name required');
+          if (!code || !name) return alert(t('pin_name_required'));
 
           if (!user) Storage.setUser({ name, role: 'student' });
           showJoinScreen(code);
@@ -499,7 +500,7 @@
           return;
         }
 
-        const name = user ? user.name : prompt("Enter your nickname:");
+        const name = user ? user.name : prompt(t('enter_nickname'));
         if (!name) return;
 
         if (!user) Storage.setUser({ name, role: 'student' });
@@ -578,20 +579,20 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:40px;">
-             ${isObserver ? `<div style="display:inline-block; font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; margin-bottom:18px;">👁 Observer mode</div>` : ''}
+             ${isObserver ? `<div style="display:inline-block; font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; margin-bottom:18px;">${t('observer_mode')}</div>` : ''}
 
              <div class="pin-card">
-               <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">Game PIN</div>
+               <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">${t('game_pin')}</div>
                 <div style="font-size:clamp(2.2rem,13vw,5rem); font-weight:900; letter-spacing:clamp(3px,2vw,8px); line-height:1; font-family:var(--font-display);">${roomCode}</div>
 
                <div style="margin-top:22px; display:flex; flex-direction:column; align-items:center; gap:12px;">
                  <img src="${qrSrc}" alt="QR" style="width:min(420px,80vw); height:min(420px,80vw); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.22); display:block;">
-                 <span style="font-size:0.78rem; color:#aaa; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;">Scan to join</span>
-                 <button id="copyLinkBtn" style="margin-top:4px; background:var(--blue); color:white; border:none; border-radius:12px; padding:12px 28px; font-weight:800; font-size:1rem; cursor:pointer; box-shadow:0 4px 0 var(--blue-shadow);">&#128279; Copy Link</button>
+                 <span style="font-size:0.78rem; color:#aaa; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;">${t('scan_to_join')}</span>
+                 <button id="copyLinkBtn" style="margin-top:4px; background:var(--blue); color:white; border:none; border-radius:12px; padding:12px 28px; font-weight:800; font-size:1rem; cursor:pointer; box-shadow:0 4px 0 var(--blue-shadow);">${t('copy_link')}</button>
                </div>
              </div>
 
-             <h2 style="color:white; margin-bottom:40px; font-size:2.2rem; text-shadow:0 2px 0 rgba(0,0,0,0.2);">Waiting for players...</h2>
+             <h2 style="color:white; margin-bottom:40px; font-size:2.2rem; text-shadow:0 2px 0 rgba(0,0,0,0.2);">${t('waiting_players')}</h2>
              
              <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:30px; margin-bottom:60px; min-height:150px;">
                ${players.map((p, i) => `
@@ -607,14 +608,14 @@
              </div>
 
              <div style="color:rgba(255,255,255,0.8); font-weight:800; font-size:1.8rem; margin-bottom:40px;">
-               ${players.length} Player${players.length !== 1 ? 's' : ''} Ready
+               ${players.length} ${t('players_ready')}
              </div>
 
              ${isCreator ? `
-               <button id="startBtn" class="btn btn-primary" style="font-size:2rem; padding:24px 80px; box-shadow: 0 10px 0 var(--blue-shadow); border-radius:var(--radius-lg);">start game</button>
+               <button id="startBtn" class="btn btn-primary" style="font-size:2rem; padding:24px 80px; box-shadow: 0 10px 0 var(--blue-shadow); border-radius:var(--radius-lg);">${t('start_game')}</button>
              ` : `
                <div style="color:white; font-size:1.4rem; background:rgba(0,0,0,0.3); padding:20px 40px; border-radius:40px; display:inline-block; backdrop-filter:blur(10px);">
-                 Host will start the game soon...
+                 ${t('host_starting')}
                </div>
              `}
           </div>
@@ -622,8 +623,8 @@
 
         document.getElementById('copyLinkBtn').addEventListener('click', function () {
           navigator.clipboard.writeText(joinUrl).then(() => {
-            this.textContent = '✓ Copied!';
-            setTimeout(() => { this.innerHTML = '&#128279; Copy Link'; }, 2000);
+            this.textContent = t('copied');
+            setTimeout(() => { this.innerHTML = t('copy_link'); }, 2000);
           }).catch(() => {
             prompt('Copy this link:', joinUrl);
           });
@@ -641,8 +642,8 @@
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-              <div class="teacher-badge" style="margin-bottom:30px;">👁️ OBSERVER MODE</div>
-              <div style="font-size:clamp(10rem, 30vw, 20rem); font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s; font-family:var(--font-display); line-height:1;">${count === 0 ? 'GO!' : count}</div>
+              <div class="teacher-badge" style="margin-bottom:30px;">👁️ ${t('observer_badge')}</div>
+              <div style="font-size:clamp(10rem, 30vw, 20rem); font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s; font-family:var(--font-display); line-height:1;">${count === 0 ? t('go') : count}</div>
               <h2 style="color:white; margin-top:40px; font-size:clamp(1.5rem, 4vw, 3rem); text-align:center; max-width:800px;">${Utils.escapeHtml(battle.testTitle)}</h2>
             </div>
           `;
@@ -740,23 +741,23 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:30px; max-width:950px;">
-            <div class="teacher-badge">👁️ LIVE DASHBOARD — ${Utils.escapeHtml(battle.testTitle)}</div>
+            <div class="teacher-badge">👁️ ${t('live_dashboard')} — ${Utils.escapeHtml(battle.testTitle)}</div>
 
             <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Players</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('players_stat')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Finished</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('finished_stat')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${players.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Avg Progress</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_progress')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">${avgProgress}/${totalQ}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Questions</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('questions')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">${totalQ}</div>
               </div>
             </div>
@@ -766,11 +767,11 @@
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>Player</th>
-                    <th>Group</th>
-                    <th>Progress</th>
-                    <th style="text-align:center;">Correct</th>
-                    <th style="text-align:center;">Status</th>
+                    <th>${t('th_player')}</th>
+                    <th>${t('th_group')}</th>
+                    <th>${t('th_progress')}</th>
+                    <th style="text-align:center;">${t('th_correct')}</th>
+                    <th style="text-align:center;">${t('th_status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -781,7 +782,7 @@
           const isFinished = p.finished;
           const barColor = isFinished ? 'var(--green)' : 'var(--blue)';
           const statusColor = isFinished ? '#26890C' : '#D89E00';
-          const statusText = isFinished ? 'Done' : 'Playing...';
+          const statusText = isFinished ? t('status_done') : t('status_playing');
 
           return `
                     <tr>
@@ -813,13 +814,13 @@
         }).join('')}
                 </tbody>
               </table>
-              ${players.length === 0 ? '<p style="color:#999; padding:30px; text-align:center;">Waiting for players to start answering...</p>' : ''}
+              ${players.length === 0 ? `<p style="color:#999; padding:30px; text-align:center;">${t('waiting_start')}</p>` : ''}
             </div>
 
             ${buildQuestionErrorStatsHtml(players, testData.questions)}
 
             ${allFinished ? `
-              <button id="finishBtn" class="btn btn-primary" style="margin-top:30px; font-size:1.5rem; padding:20px 60px;">Show Final Results</button>
+              <button id="finishBtn" class="btn btn-primary" style="margin-top:30px; font-size:1.5rem; padding:20px 60px;">${t('show_final')}</button>
             ` : ''}
           </div>
         `;
@@ -838,21 +839,21 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:30px; max-width:950px;">
-            <div class="teacher-badge">📊 FINAL RESULTS — ${Utils.escapeHtml(battle.testTitle)}</div>
+            <div class="teacher-badge">📊 ${t('final_results')} — ${Utils.escapeHtml(battle.testTitle)}</div>
 
             <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Participants</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('participants')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Avg Score</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
                   ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.correctCount || 0), 0) / players.length * 100 / totalQ) : 0}%
                 </div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
-                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">Best Score</div>
+                <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('best_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
                   ${players.length > 0 ? Math.round((players[0].correctCount || 0) / totalQ * 100) : 0}%
                 </div>
@@ -863,12 +864,12 @@
               <table class="stats-table">
                 <thead>
                   <tr>
-                    <th>Rank</th>
-                    <th>Player</th>
-                    <th>Group</th>
-                    <th style="text-align:center;">Score</th>
-                    <th style="text-align:center;">Correct</th>
-                    <th style="text-align:right;">Time</th>
+                    <th>${t('th_rank')}</th>
+                    <th>${t('th_player')}</th>
+                    <th>${t('th_group')}</th>
+                    <th style="text-align:center;">${t('th_score')}</th>
+                    <th style="text-align:center;">${t('th_correct')}</th>
+                    <th style="text-align:right;">${t('th_time')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -902,8 +903,8 @@
             ${testData ? buildQuestionErrorStatsHtml(Object.values(battle.players), testData.questions) : ''}
 
             <div style="margin-top:30px; display:flex; gap:15px; justify-content:center; flex-wrap:wrap;">
-              <a href="leaderboard.html?test=${battle.testId}" class="btn btn-primary" style="padding:15px 30px;">View Leaderboard</a>
-              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:15px 30px;">Back to Menu</a>
+              <a href="leaderboard.html?test=${battle.testId}" class="btn btn-primary" style="padding:15px 30px;">${t('view_leaderboard')}</a>
+              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:15px 30px;">${t('back_to_menu')}</a>
             </div>
           </div>
         `;
@@ -916,7 +917,7 @@
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-              <div style="font-size:clamp(10rem, 30vw, 20rem); font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s; font-family:var(--font-display); line-height:1;">${count === 0 ? 'GO!' : count}</div>
+              <div style="font-size:clamp(10rem, 30vw, 20rem); font-weight:900; color:white; text-shadow:0 10px 0 rgba(0,0,0,0.2); animation:popIn 0.5s; font-family:var(--font-display); line-height:1;">${count === 0 ? t('go') : count}</div>
               <h2 style="color:white; margin-top:40px; font-size:clamp(1.5rem, 4vw, 3rem); text-align:center; max-width:800px;">${Utils.escapeHtml(battle.testTitle)}</h2>
               ${count > 0 ? `<div style="width:100%; position:fixed; bottom:0; height:20px; background:rgba(255,255,255,0.1);">
                 <div style="width:${(count / 3) * 100}%; height:100%; background:var(--yellow); transition:width 1s linear;"></div>
@@ -1185,12 +1186,12 @@
         // Wait screen
         document.getElementById('app').innerHTML = `
            <div class="container fade-in center-content" style="text-align:center;">
-             <h1 style="color:white; font-size:clamp(3rem, 5vw, 4rem); margin-bottom:20px;">FINISHED!</h1>
+             <h1 style="color:white; font-size:clamp(3rem, 5vw, 4rem); margin-bottom:20px;">${t('finished')}</h1>
              <div class="card" style="display:inline-block; min-width:320px; border-top:10px solid var(--primary);">
-               <div style="font-size:1.2rem; color:#888; font-weight:800; text-transform:uppercase;">Your Score</div>
+               <div style="font-size:1.2rem; color:#888; font-weight:800; text-transform:uppercase;">${t('your_score')}</div>
                <div style="font-size:6rem; font-weight:900; color:var(--text-main); font-family:var(--font-display); line-height:1; margin-top:10px;">${correctCount}<span style="font-size:3rem; color:#ccc;">/${testData.questions.length}</span></div>
              </div>
-             <p style="color:rgba(255,255,255,0.8); font-size:1.5rem; margin-top:40px; font-weight:700;">Waiting for others...</p>
+             <p style="color:rgba(255,255,255,0.8); font-size:1.5rem; margin-top:40px; font-weight:700;">${t('waiting_others')}</p>
            </div>
          `;
 
@@ -1219,7 +1220,7 @@
 
         document.getElementById('app').innerHTML = `
           <div class="container fade-in" style="text-align:center; padding-top:40px;">
-            <h1 style="color:white; text-shadow:none; font-size:clamp(3rem, 5vw, 4.5rem); margin-bottom:40px;">PODIUM</h1>
+            <h1 style="color:white; text-shadow:none; font-size:clamp(3rem, 5vw, 4.5rem); margin-bottom:40px;">${t('podium')}</h1>
             
             <div class="podium-container" style="margin-bottom:60px;">
               ${p2 ? `
@@ -1227,7 +1228,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#C0C0C0; color:white; width:70px; height:70px; font-size:1.8rem;">${p2.name.charAt(0)}</div>
                    <div class="podium-rank-2" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#D8D8D8,#9A9A9A); height:140px;">2</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p2.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.correctCount} pts</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.correctCount} ${t('pts')}</div>
                 </div>
               ` : ''}
 
@@ -1237,7 +1238,7 @@
                  </div>
                  <div class="podium-rank-1" style="width:100%; border-radius:15px 15px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; font-weight:900; font-size:4rem; color:white; box-shadow:0 8px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#FFD700,#C68C00); height:180px;">1</div>
                  <div style="background:white; color:#333; width:100%; padding:15px 5px; font-weight:900; border-radius:0 0 8px 8px; font-size:1.4rem; margin-top:4px;">${Utils.escapeHtml(p1.name)}</div>
-                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.correctCount} pts</div>
+                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.correctCount} ${t('pts')}</div>
               </div>
 
               ${p3 ? `
@@ -1245,7 +1246,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#CD7F32; color:white; width:70px; height:70px; font-size:1.8rem;">${p3.name.charAt(0)}</div>
                    <div class="podium-rank-3" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#E0A060,#B06828); height:110px;">3</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p3.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.correctCount} pts</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.correctCount} ${t('pts')}</div>
                 </div>
               ` : ''}
             </div>
@@ -1263,7 +1264,7 @@
                       <td style="padding:10px 8px; width:36px; font-size:${i < 3 ? '1.25rem' : '1rem'}; text-align:center;">${rankLabel}</td>
                       <td style="padding:10px 8px; color:white; font-weight:800; font-size:1rem;">${Utils.escapeHtml(p.name)}</td>
                       <td style="padding:10px 8px; color:rgba(255,255,255,0.5); font-size:0.85rem;">${Utils.escapeHtml(p.group || '')}</td>
-                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.correctCount} pts</td>
+                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.correctCount} ${t('pts')}</td>
                       <td style="padding:10px 8px; color:rgba(255,255,255,0.5); text-align:right; font-size:0.85rem;">${Utils.formatTime(p.timeSpent || 0)}</td>
                     </tr>`;
                   }).join('')}
@@ -1271,7 +1272,7 @@
               </table>
             </div>` : ''}
 
-            <a href="tests.html" class="btn btn-outline" style="color:white; border-color:white; background:rgba(255,255,255,0.1); padding:20px 40px; font-size:1.4rem;">Exit to Menu</a>
+            <a href="tests.html" class="btn btn-outline" style="color:white; border-color:white; background:rgba(255,255,255,0.1); padding:20px 40px; font-size:1.4rem;">${t('exit_to_menu')}</a>
           </div>
         `;
       }

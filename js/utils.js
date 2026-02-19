@@ -57,16 +57,17 @@ const Utils = (() => {
         <div style="display:flex;align-items:center;gap:10px;">
           <a href="index.html" class="header-logo">TestArena</a>
           <span class="badge ${online ? 'badge-live' : 'badge-ended'}" style="font-size:0.7rem;">
-            ${online ? 'ONLINE' : 'OFFLINE'}
+            ${online ? t('online') : t('offline')}
           </span>
         </div>
         <nav class="header-nav">
           ${user ? `<span class="header-user">${escapeHtml(user.name)}${user.group ? ' (' + escapeHtml(user.group) + ')' : ''}</span>` : ''}
-          <a href="tests.html" class="btn btn-sm ${activePage === 'tests' ? 'btn-primary' : 'btn-outline'}">Тесты</a>
-          <a href="battle.html" class="btn btn-sm ${activePage === 'battle' ? 'btn-accent' : 'btn-outline'}">Battle</a>
-          <a href="leaderboard.html" class="btn btn-sm ${activePage === 'leaderboard' ? 'btn-primary' : 'btn-outline'}">Рейтинг</a>
-          ${isAdmin ? `<a href="admin.html" class="btn btn-sm ${activePage === 'admin' ? 'btn-accent' : 'btn-outline'}">Админ</a>` : ''}
-          ${user ? `<button onclick="App.logout()" class="btn btn-sm btn-outline">Выйти</button>` : ''}
+          <a href="tests.html" class="btn btn-sm ${activePage === 'tests' ? 'btn-primary' : 'btn-outline'}">${t('nav_tests')}</a>
+          <a href="battle.html" class="btn btn-sm ${activePage === 'battle' ? 'btn-accent' : 'btn-outline'}">${t('nav_battle')}</a>
+          <a href="leaderboard.html" class="btn btn-sm ${activePage === 'leaderboard' ? 'btn-primary' : 'btn-outline'}">${t('nav_leaderboard')}</a>
+          ${isAdmin ? `<a href="admin.html" class="btn btn-sm ${activePage === 'admin' ? 'btn-accent' : 'btn-outline'}">${t('nav_admin')}</a>` : ''}
+          ${user ? `<button onclick="App.logout()" class="btn btn-sm btn-outline">${t('nav_logout')}</button>` : ''}
+          ${renderLangSwitcher()}
         </nav>
       </header>
     `;

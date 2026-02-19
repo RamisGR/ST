@@ -30,6 +30,7 @@
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
@@ -48,12 +49,13 @@
               TEST ARENA
             </div>
             <div class="user-header-block">
+              ${renderLangSwitcher()}
               <div style="text-align:right; color:white;">
                 <div style="font-weight:900; font-size:1.1rem;">${Utils.escapeHtml(user.name)}</div>
-                <div style="font-size:0.8rem; opacity:0.8; font-weight:700;">${Utils.escapeHtml(user.group || 'Player')}</div>
+                <div style="font-size:0.8rem; opacity:0.8; font-weight:700;">${Utils.escapeHtml(user.group || t('player_default'))}</div>
               </div>
               <div class="avatar" style="width:50px; height:50px; font-size:1.5rem; border:3px solid white; box-shadow:none; margin:0;">${user.name.charAt(0).toUpperCase()}</div>
-              <button onclick="Storage.logout()" class="btn btn-danger" style="padding: 10px 20px; font-size:0.9rem; margin-left:10px; border-width:2px;">Quit</button>
+              <button onclick="Storage.logout()" class="btn btn-danger" style="padding: 10px 20px; font-size:0.9rem; margin-left:10px; border-width:2px;">${t('quit')}</button>
             </div>
           </header>
         `;
@@ -69,18 +71,18 @@
           ${headerHtml}
           <div class="fade-in">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; flex-wrap:wrap; gap:20px;">
-              <h2 style="text-align:left; margin:0; font-size:clamp(1.5rem, 5vw, 2.5rem); text-shadow:none; line-height:1; color:white; opacity:0.9;">Challenges</h2>
-              
+              <h2 style="text-align:left; margin:0; font-size:clamp(1.5rem, 5vw, 2.5rem); text-shadow:none; line-height:1; color:white; opacity:0.9;">${t('challenges')}</h2>
+
               <a href="battle.html" class="btn btn-warning" style="font-size:1.1rem; padding:15px 30px; transform:rotate(-2deg); box-shadow: 0 6px 0 var(--yellow-shadow); border:none; border-bottom:5px solid var(--yellow-shadow); color:var(--text-main);">
                 <span class="shape-icon shape-triangle" style="background:#333; width:20px; height:20px; vertical-align:middle; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right:10px;"></span>
-                BATTLE MODE
+                ${t('battle_mode')}
               </a>
             </div>
 
             ${tests.length === 0 ? `
               <div class="card empty-state" style="text-align:center; padding: 80px;">
                 <div style="font-size:6rem; margin-bottom:20px; opacity:0.3;">?</div>
-                <p style="font-size:2rem; font-weight:800; color:#888;">No challenges available yet!</p>
+                <p style="font-size:2rem; font-weight:800; color:#888;">${t('no_challenges')}</p>
               </div>
             ` : `
               <div class="test-grid">
@@ -105,14 +107,14 @@
                       <div style="margin-bottom:20px;">
                         <h3 style="font-size:1.7rem; font-weight:900; margin-bottom:15px; color:#222; line-height:1.2;">${Utils.escapeHtml(test.title)}</h3>
                         <div style="display:flex; gap:10px; font-size:0.9rem; color:#666; font-weight:800; flex-wrap:wrap;">
-                          <span style="background:#f4f4f4; padding:8px 12px; border-radius:8px;">${test.questions.length} Qs</span>
+                          <span style="background:#f4f4f4; padding:8px 12px; border-radius:8px;">${test.questions.length} ${t('qs')}</span>
                           <span style="background:#f4f4f4; padding:8px 12px; border-radius:8px;">${Utils.formatTime(test.timeLimit)}</span>
                         </div>
                       </div>
                       
                       <div style="display:grid; grid-template-columns: 1fr auto; gap: 15px;">
                         <button onclick="startTest('${test.id}')" class="btn" style="background:${color}; color:white; width:100%; border-bottom-color: rgba(0,0,0,0.2);">
-                          ${completed ? 'Replay' : 'Play'}
+                          ${completed ? t('replay') : t('play')}
                         </button>
                         <a href="leaderboard.html?test=${test.id}" class="btn btn-outline" style="padding:0 20px;" title="Leaderboard">
                           <span style="font-size:1.4rem;">🏆</span>

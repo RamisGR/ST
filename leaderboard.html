@@ -50,6 +50,7 @@
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
@@ -80,14 +81,14 @@
           document.getElementById('app').innerHTML = `
             <div class="fade-in">
               <div style="display:flex; align-items:center; gap:20px; margin-bottom:40px;">
-                <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px;">&larr; BACK</a>
-                <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin:0; line-height:1; color:white;">HALL OF FAME</h1>
+                <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px;">${t('back')}</a>
+                <div style="display:flex; align-items:center; gap:15px;">${renderLangSwitcher()}<h1 style="font-size:clamp(2rem, 5vw, 3rem); margin:0; line-height:1; color:white;">${t('hall_of_fame')}</h1></div>
               </div>
               <div class="test-grid">
                 ${allTests.map(t => `
                   <a href="leaderboard.html?test=${t.id}" class="card" style="text-decoration:none; color:inherit; border-top:8px solid var(--blue); transition:transform 0.2s;">
                     <h2 style="margin:0 0 10px 0;">${Utils.escapeHtml(t.title)}</h2>
-                    <div style="color:#666; font-weight:700;">View Rankings &rarr;</div>
+                    <div style="color:#666; font-weight:700;">${t('view_rankings')}</div>
                   </a>
                 `).join('')}
               </div>
@@ -99,9 +100,9 @@
         document.getElementById('app').innerHTML = `
           <div class="fade-in">
             <div style="display:flex; align-items:center; gap:20px; margin-bottom:40px;">
-              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px; font-weight:700;">&larr; BACK</a>
+              <a href="tests.html" class="btn btn-outline" style="color:white; background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.3); padding:10px 20px; font-weight:700;">${t('back')}</a>
               <div>
-                <div style="font-size:1rem; color:rgba(255,255,255,0.7); font-weight:800; text-transform:uppercase; letter-spacing:1px;">Leaderboard</div>
+                <div style="font-size:1rem; color:rgba(255,255,255,0.7); font-weight:800; text-transform:uppercase; letter-spacing:1px;">${t('leaderboard')}</div>
                 <h1 style="font-size:clamp(1.5rem, 5vw, 3rem); margin:0; line-height:1; color:white; text-shadow:0 3px 0 rgba(0,0,0,0.2);">${Utils.escapeHtml(test ? test.title : 'Details')}</h1>
               </div>
             </div>
@@ -110,15 +111,15 @@
                ${results.length === 0 ? `
                  <div style="text-align:center; padding:60px; color:white;">
                    <div style="font-size:5rem; opacity:0.3; margin-bottom:20px;">🏆</div>
-                   <div style="font-size:2rem; font-weight:800; margin-bottom:10px;">No Champions Yet</div>
-                   <p style="font-size:1.2rem; opacity:0.8;">Be the first to conquer this challenge!</p>
-                   <a href="test.html?id=${testId}" class="btn btn-primary" style="margin-top:30px; font-size:1.2rem; padding:15px 30px;">Start Challenge</a>
+                   <div style="font-size:2rem; font-weight:800; margin-bottom:10px;">${t('no_champions')}</div>
+                   <p style="font-size:1.2rem; opacity:0.8;">${t('first_conquer')}</p>
+                   <a href="test.html?id=${testId}" class="btn btn-primary" style="margin-top:30px; font-size:1.2rem; padding:15px 30px;">${t('start_challenge')}</a>
                  </div>
                ` : `
                  <div class="leaderboard-header">
-                   <div style="text-align:center;">Rank</div>
-                   <div>Player</div>
-                   <div style="text-align:right;">Score</div>
+                   <div style="text-align:center;">${t('rank')}</div>
+                   <div>${t('player')}</div>
+                   <div style="text-align:right;">${t('score')}</div>
                  </div>
 
                  <div style="max-height:60vh; overflow-y:auto; padding-right:10px;">
@@ -142,9 +143,9 @@
                            </div>
                            <div style="display:flex; flex-direction:column; overflow:hidden;">
                              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:1.1rem; ${isMe ? 'color:var(--blue); font-weight:900;' : ''}">
-                               ${Utils.escapeHtml(r.userName)} ${isMe ? '(You)' : ''}
+                               ${Utils.escapeHtml(r.userName)} ${isMe ? t('you') : ''}
                              </span>
-                             <span style="font-size:0.8rem; color:#999; font-weight:600;">Time: ${Utils.formatTime(r.timeSpent)}</span>
+                             <span style="font-size:0.8rem; color:#999; font-weight:600;">${t('time')}: ${Utils.formatTime(r.timeSpent)}</span>
                            </div>
                          </div>
                          <div style="text-align:right;">

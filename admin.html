@@ -111,15 +111,15 @@
   <div id="confirmModal" class="modal-overlay">
     <div class="modal">
       <div class="card-header"
-        style="background:var(--red); color:white; padding:10px 20px; border-radius:10px 10px 0 0; font-weight:900;">
-        CONFIRM ACTION
+        style="background:var(--red); color:white; padding:10px 20px; border-radius:10px 10px 0 0; font-weight:900;"
+        id="modalHeader">CONFIRM ACTION
       </div>
       <div style="padding:20px;">
         <h2 id="modalTitle" style="margin-bottom: 15px; font-size: 1.5rem; color:#333;">Confirm?</h2>
         <p id="modalText" style="margin-bottom: 25px; color:#666; font-size:1.1rem;"></p>
         <div class="modal-actions" style="display:flex; gap:12px; justify-content: flex-end;">
-          <button id="modalCancel" class="btn btn-outline" style="color:#555; border-color:#ccc;">Cancel</button>
-          <button id="modalConfirm" class="btn btn-danger">Yes, I'm sure</button>
+          <button id="modalCancel" class="btn btn-outline" style="color:#555; border-color:#ccc;">${t('cancel')}</button>
+          <button id="modalConfirm" class="btn btn-danger">${t('yes_sure')}</button>
         </div>
       </div>
     </div>
@@ -134,6 +134,7 @@
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/utils.js"></script>
   <script>
@@ -162,27 +163,27 @@
       function showAdminLogin() {
         document.getElementById('app').innerHTML = `
           <div class="fade-in" style="text-align:center; max-width:400px; width:90%; margin:0 auto;">
-            <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin-bottom:10px; color:white; text-shadow:0 4px 0 rgba(0,0,0,0.2);">GAME MASTER</h1>
-            <p style="color:rgba(255,255,255,0.7); margin-bottom:30px; font-weight:700;">Teacher Console Access</p>
+            <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin-bottom:10px; color:white; text-shadow:0 4px 0 rgba(0,0,0,0.2);">${t('game_master')}</h1>
+            <p style="color:rgba(255,255,255,0.7); margin-bottom:30px; font-weight:700;">${t('console_access')}</p>
             
             <div class="card" style="border-top:12px solid var(--yellow); padding:30px; text-align:left;">
                 <div class="form-group">
-                  <label>Your Name</label>
-                  <input type="text" id="adminName" class="form-control" placeholder="Teacher name"
+                  <label>${t('enter_your_name')}</label>
+                  <input type="text" id="adminName" class="form-control" placeholder="${t('teacher_name')}"
                     value="${user ? Utils.escapeHtml(user.name) : ''}" style="text-align:center; font-weight:700;">
                 </div>
                 <div class="form-group">
-                  <label>Admin Password</label>
-                  <input type="password" id="adminPassword" class="form-control" placeholder="Enter password"
+                  <label>${t('admin_password')}</label>
+                  <input type="password" id="adminPassword" class="form-control" placeholder="${t('enter_password')}"
                     style="text-align:center; font-weight:700; letter-spacing:3px;">
                 </div>
                 <button type="button" id="adminLoginBtn" class="btn btn-block" style="background:var(--yellow); color:#333; font-size:1.2rem; padding:18px; border-bottom:5px solid var(--yellow-shadow);">
-                  Enter Console
+                  ${t('enter_console')}
                 </button>
               <div id="loginError" style="color:white; font-weight:700; text-align:center; margin-top:15px; padding:12px; border-radius:8px; background:var(--red); display:none;"></div>
             </div>
 
-            <a href="${user ? 'tests.html' : 'index.html'}" class="btn" style="background:rgba(255,255,255,0.1); border:none; color:rgba(255,255,255,0.6); margin-top:20px; font-size:0.9rem;">${user ? 'Back to Lobby' : 'Back to Login'}</a>
+            <a href="${user ? 'tests.html' : 'index.html'}" class="btn" style="background:rgba(255,255,255,0.1); border:none; color:rgba(255,255,255,0.6); margin-top:20px; font-size:0.9rem;">${user ? t('back_to_lobby') : t('back_to_login')}</a>
           </div>
         `;
 
@@ -191,11 +192,11 @@
           const pass = document.getElementById('adminPassword').value.trim();
 
           if (!name) {
-            showLoginError('Enter your name');
+            showLoginError(t('enter_your_name'));
             return;
           }
           if (!pass) {
-            showLoginError('Enter password');
+            showLoginError(t('password_required'));
             return;
           }
 
@@ -206,7 +207,7 @@
             Storage.setUser(user);
             initAdmin(user);
           } else {
-            showLoginError('Wrong password!');
+            showLoginError(t('wrong_password'));
           }
         }
 
@@ -234,11 +235,12 @@
           const headerHtml = `
           <div class="admin-header">
             <div style="font-weight: 900; font-size: 1.4rem; text-transform: uppercase; letter-spacing:1px;">
-              TEST ARENA <span style="opacity:0.5; margin:0 5px;">//</span> <span style="color:var(--yellow);">GAME MASTER</span>
+              TEST ARENA <span style="opacity:0.5; margin:0 5px;">//</span> <span style="color:var(--yellow);">${t('game_master')}</span>
             </div>
             <div style="font-weight: 700; font-size: 0.9rem; display:flex; align-items:center; gap:15px;">
+              ${renderLangSwitcher()}
               <span>${Utils.escapeHtml(user.name)}</span>
-              <button onclick="Storage.logout()" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.15); padding:5px 15px; font-size:0.8rem;">LOGOUT</button>
+              <button onclick="Storage.logout()" class="btn btn-outline" style="color:white; border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.15); padding:5px 15px; font-size:0.8rem;">${t('logout')}</button>
             </div>
           </div>
         `;
@@ -247,12 +249,12 @@
           ${headerHtml}
           <div class="fade-in">
             <nav class="tab-nav">
-              <button class="tab-btn ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">Challenges</button>
+              <button class="tab-btn ${currentTab === 'tests' ? 'active' : ''}" onclick="switchTab('tests')">${t('tab_challenges')}</button>
               <button class="tab-btn ${currentTab === 'editor' ? 'active' : ''}" onclick="switchTab('editor')">
-                ${editingTest ? 'Edit Challenge' : 'Create New'}
+                ${editingTest ? t('tab_edit') : t('tab_create')}
               </button>
-              <button class="tab-btn ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">Results</button>
-              <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">Settings</button>
+              <button class="tab-btn ${currentTab === 'results' ? 'active' : ''}" onclick="switchTab('results')">${t('tab_results')}</button>
+              <button class="tab-btn ${currentTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">${t('tab_settings')}</button>
             </nav>
 
             <div id="tabContent"></div>
@@ -280,20 +282,20 @@
           const tests = Storage.getTests();
           document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:10px;">
-            <p style="color:#666; font-weight:700;">Total Challenges: ${tests.length}</p>
+            <p style="color:#666; font-weight:700;">${t('total_challenges')}: ${tests.length}</p>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
               <button onclick="document.getElementById('excelImportInput').click()" class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem; background:#f0fff4; border-color:var(--green); color:var(--green);">
-                &#x1F4CA; Import Excel
+                &#x1F4CA; ${t('import_excel')}
               </button>
               <input type="file" id="excelImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importFromExcel(this)">
-              <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">+ New Challenge</button>
+              <button onclick="createNewTest()" class="btn btn-primary" style="padding:10px 20px;">${t('new_challenge')}</button>
             </div>
           </div>
           ${tests.length === 0 ? `
             <div class="empty-state card" style="text-align:center; padding:50px;">
               <div style="font-size:4rem; margin-bottom:10px;">📭</div>
-              <p style="font-size:1.5rem; font-weight:700; color:#555;">No challenges found.</p>
-              <p style="color:#888;">Create your first challenge to get started!</p>
+              <p style="font-size:1.5rem; font-weight:700; color:#555;">${t('no_challenges_found')}</p>
+              <p style="color:#888;">${t('create_first')}</p>
             </div>
           ` : `
             <div style="display:grid; gap:20px;">
@@ -304,14 +306,14 @@
                     <div>
                       <h3 style="margin:0 0 5px 0; font-size:1.3rem; color:#333;">${Utils.escapeHtml(test.title)}</h3>
                       <div style="font-size:0.9rem; color:#888; font-weight:600;">
-                        ${test.questions.length} Questions • ${Utils.formatTime(test.timeLimit)} • ${results.length} Attempts
+                        ${test.questions.length} ${t('questions')} • ${Utils.formatTime(test.timeLimit)} • ${results.length} ${t('attempts')}
                       </div>
                     </div>
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                      <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; Preview</button>
-                      <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; Battle</button>
-                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">Edit</button>
-                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">Delete</button>
+                      <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; ${t('preview')}</button>
+                      <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; ${t('battle')}</button>
+                      <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">${t('edit')}</button>
+                      <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">${t('delete')}</button>
                     </div>
                   </div>
                 `;
@@ -342,9 +344,9 @@
         };
 
         window.confirmDeleteTest = function (id, title) {
-          showConfirmModal(`Delete "${title}"?`, 'This cannot be undone. All results for this challenge will also be lost.', () => {
+          showConfirmModal(t('confirm_delete', title), t('cannot_undo'), () => {
             Storage.deleteTest(id);
-            Utils.showNotification('Challenge deleted!', 'success');
+            Utils.showNotification(t('deleted_notif'), 'success');
             render();
           });
         };
@@ -389,31 +391,31 @@
           const bs = t.battleSettings;
           document.getElementById('tabContent').innerHTML = `
           <div class="editor-section">
-            <h2 style="margin-bottom:20px; color:#333;">Challenge Settings</h2>
+            <h2 style="margin-bottom:20px; color:#333;">${t('challenge_settings')}</h2>
             <div class="form-group">
-              <label>Title</label>
-              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="e.g. History Trivia" style="font-weight:700;">
+              <label>${t('title')}</label>
+              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="${t('placeholder_title')}" style="font-weight:700;">
             </div>
             <div class="form-group">
-              <label>Description</label>
-              <textarea id="testDesc" class="form-control" rows="2" placeholder="Brief instruction...">${Utils.escapeHtml(t.description || '')}</textarea>
+              <label>${t('description')}</label>
+              <textarea id="testDesc" class="form-control" rows="2" placeholder="${t('placeholder_desc')}">${Utils.escapeHtml(t.description || '')}</textarea>
             </div>
             <div class="form-group">
-              <label>Time Limit (Seconds) — Classic Mode</label>
+              <label>${t('time_limit_classic')}</label>
               <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:150px;">
             </div>
 
             <!-- Battle Settings -->
             <div style="margin-top:30px; padding:25px; background:#f0f0ff; border-radius:12px; border:2px solid #ddd;">
               <h3 style="margin:0 0 20px; color:#333; display:flex; align-items:center; gap:10px;">
-                <span style="font-size:1.5rem;">⚔️</span> Battle Mode Settings
+                <span style="font-size:1.5rem;">⚔️</span> ${t('battle_settings')}
               </h3>
               <div class="form-group" style="margin-bottom:15px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                   <input type="checkbox" id="bsPerQuestion" ${bs.perQuestionMode ? 'checked' : ''} style="width:20px;height:20px;accent-color:var(--blue);">
-                  <label for="bsPerQuestion" style="margin:0; text-transform:none; font-size:1rem; color:#333;">Enable Per-Question Timer Mode</label>
+                  <label for="bsPerQuestion" style="margin:0; text-transform:none; font-size:1rem; color:#333;">${t('enable_per_q')}</label>
                 </div>
-                <p style="color:#888; font-size:0.85rem; margin-top:5px; margin-left:30px;">Each question gets its own timer. After time expires, answer rating is shown.</p>
+                <p style="color:#888; font-size:0.85rem; margin-top:5px; margin-left:30px;">${t('per_q_hint')}</p>
               </div>
               <div id="bsDetails" style="display:${bs.perQuestionMode ? 'block' : 'none'}; padding-left:10px; border-left:3px solid var(--blue);">
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
@@ -456,7 +458,7 @@
             </div>
 
             <h2 style="margin:40px 0 20px; color:#333;">
-              Questions (${t.questions.length})
+              ${t('questions_count', t.questions.length)}
             </h2>
 
             <div id="questionsList">
@@ -464,12 +466,12 @@
             </div>
 
             <div style="text-align:center; margin:24px 0 8px;">
-              <button onclick="addQuestion()" class="btn btn-success" style="padding:12px 30px; font-size:1rem;">+ Add Question</button>
+              <button onclick="addQuestion()" class="btn btn-success" style="padding:12px 30px; font-size:1rem;">${t('add_question')}</button>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee;">
-               <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">Discard</button>
-               <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">Save Challenge</button>
+               <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">${t('discard')}</button>
+               <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">${t('save_challenge')}</button>
             </div>
           </div>
         `;
@@ -527,14 +529,14 @@
           return `
           <div class="q-card" data-qi="${qi}">
             <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-              <span style="font-weight:800; color:#888;">Question ${qi + 1}</span>
+              <span style="font-weight:800; color:#888;">${t('question_n', qi + 1)}</span>
               ${editingTest.questions.length > 1 ? `
-                <button onclick="removeQuestion(${qi})" style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:700;">Remove</button>
+                <button onclick="removeQuestion(${qi})" style="color:var(--danger); border:none; background:none; cursor:pointer; font-weight:700;">${t('remove')}</button>
               ` : ''}
             </div>
             <div class="form-group">
               <input type="text" class="form-control q-text" data-qi="${qi}"
-                     value="${Utils.escapeHtml(q.text)}" placeholder="Enter question text here..." style="font-weight:600;">
+                     value="${Utils.escapeHtml(q.text)}" placeholder="${t('q_placeholder')}" style="font-weight:600;">
             </div>
             ${imgSection}
             <div class="options-editor" style="margin-top:16px;">
@@ -585,11 +587,11 @@
         };
         window.saveTest = function () {
           const t = editingTest;
-          if (!t.title.trim()) { Utils.showNotification('Title is required!', 'error'); return; }
-          if (t.questions.some(q => !q.text.trim())) { Utils.showNotification('Some questions are empty!', 'error'); return; }
-          if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification('Some options are empty!', 'error'); return; }
+          if (!t.title.trim()) { Utils.showNotification(t('title_required'), 'error'); return; }
+          if (t.questions.some(q => !q.text.trim())) { Utils.showNotification(t('empty_questions'), 'error'); return; }
+          if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification(t('empty_options'), 'error'); return; }
           Storage.saveTest(t);
-          Utils.showNotification('Challenge Saved Successfully!', 'success');
+          Utils.showNotification(t('saved_notif'), 'success');
           editingTest = null;
           currentTab = 'tests';
           render();
@@ -602,9 +604,9 @@
 
           document.getElementById('tabContent').innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-            <p style="color:#666; font-weight:700;">Total Records: ${allResults.length}</p>
+            <p style="color:#666; font-weight:700;">${t('total_records')}: ${allResults.length}</p>
             ${allResults.length > 0 ? `
-              <button onclick="confirmClearResults()" class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);">Clear All History</button>
+              <button onclick="confirmClearResults()" class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);">${t('clear_history')}</button>
             ` : ''}
           </div>
 
@@ -620,12 +622,12 @@
                 <table class="leaderboard-table" style="width:100%; border-collapse:collapse;">
                   <thead>
                     <tr style="background:white; border-bottom:2px solid #eee; text-align:left; color:#888; font-size:0.9rem;">
-                      <th style="padding:12px 20px;">Rank</th>
-                      <th style="padding:12px;">Player</th>
-                      <th style="padding:12px;">Group</th>
-                      <th style="padding:12px; text-align:right;">Score</th>
-                      <th style="padding:12px; text-align:right;">Time</th>
-                      <th style="padding:12px; text-align:right;">Date</th>
+                      <th style="padding:12px 20px;">${t('rank')}</th>
+                      <th style="padding:12px;">${t('player')}</th>
+                      <th style="padding:12px;">${t('th_group')}</th>
+                      <th style="padding:12px; text-align:right;">${t('score')}</th>
+                      <th style="padding:12px; text-align:right;">${t('time')}</th>
+                      <th style="padding:12px; text-align:right;">${t('date')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -643,14 +645,14 @@
                 </table>
               </div>
             `;
-          }).join('') || '<div class="empty-state card" style="text-align:center; padding:40px;"><p>No results recorded yet.</p></div>'}
+          }).join('') || `<div class="empty-state card" style="text-align:center; padding:40px;"><p>${t('no_results')}</p></div>`}
         `;
         }
 
         window.confirmClearResults = function () {
-          showConfirmModal('Clear All History?', 'This will permanently delete all student results. Challenges will remain.', () => {
+          showConfirmModal(t('clear_history') + '?', 'This will permanently delete all student results. Challenges will remain.', () => {
             Storage.clearAllResults();
-            Utils.showNotification('History cleared!', 'success');
+            Utils.showNotification(t('history_cleared'), 'success');
             render();
           });
         };
@@ -660,17 +662,17 @@
           const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
           document.getElementById('tabContent').innerHTML = `
           <div class="card" style="max-width:500px; margin:0 auto; padding:30px;">
-            <h2 style="margin-bottom:25px; color:#333;">System Configuration</h2>
+            <h2 style="margin-bottom:25px; color:#333;">${t('system_config')}</h2>
             <div class="form-group">
-              <label>Admin Password</label>
+              <label>${t('admin_password')}</label>
               <input type="text" id="adminPass" class="form-control" value="${Utils.escapeHtml(currentPassword)}">
             </div>
-            <button onclick="saveSettings()" class="btn btn-primary btn-block" style="margin-top:20px;">Save Configuration</button>
+            <button onclick="saveSettings()" class="btn btn-primary btn-block" style="margin-top:20px;">${t('save_config')}</button>
 
             <div style="margin-top:50px; padding-top:25px; border-top:2px solid #eee;">
-              <h3 style="margin-bottom:15px; color:var(--danger);">Danger Zone</h3>
-              <p style="color:#666; margin-bottom:15px; font-size:0.9rem;">Resetting the system will delete ALL challenges and ALL results. This provides a fresh start.</p>
-              <button onclick="confirmResetAll()" class="btn btn-block btn-outline" style="color:var(--danger); border-color:var(--danger);">Factory Reset</button>
+              <h3 style="margin-bottom:15px; color:var(--danger);">${t('danger_zone')}</h3>
+              <p style="color:#666; margin-bottom:15px; font-size:0.9rem;">${t('reset_warning')}</p>
+              <button onclick="confirmResetAll()" class="btn btn-block btn-outline" style="color:var(--danger); border-color:var(--danger);">${t('factory_reset')}</button>
             </div>
           </div>
         `;
@@ -678,15 +680,15 @@
 
         window.saveSettings = function () {
           const pass = document.getElementById('adminPass').value.trim();
-          if (!pass) { Utils.showNotification('Password required!', 'error'); return; }
+          if (!pass) { Utils.showNotification(t('password_required'), 'error'); return; }
           localStorage.setItem('ct_admin_password', pass);
-          Utils.showNotification('Settings saved!', 'success');
+          Utils.showNotification(t('settings_saved'), 'success');
         };
 
         window.confirmResetAll = function () {
-          showConfirmModal('Factory Reset?', 'WARNING: This will delete ALL challenges and results. Are you sure?', () => {
+          showConfirmModal(t('factory_reset') + '?', 'WARNING: This will delete ALL challenges and results. Are you sure?', () => {
             Storage.resetAllData();
-            Utils.showNotification('System reset successfully', 'success');
+            Utils.showNotification(t('system_reset'), 'success');
             render();
           });
         };
