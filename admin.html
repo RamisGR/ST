@@ -118,8 +118,8 @@
         <h2 id="modalTitle" style="margin-bottom: 15px; font-size: 1.5rem; color:#333;">Confirm?</h2>
         <p id="modalText" style="margin-bottom: 25px; color:#666; font-size:1.1rem;"></p>
         <div class="modal-actions" style="display:flex; gap:12px; justify-content: flex-end;">
-          <button id="modalCancel" class="btn btn-outline" style="color:#555; border-color:#ccc;">${t('cancel')}</button>
-          <button id="modalConfirm" class="btn btn-danger">${t('yes_sure')}</button>
+          <button id="modalCancel" class="btn btn-outline" style="color:#555; border-color:#ccc;"></button>
+          <button id="modalConfirm" class="btn btn-danger"></button>
         </div>
       </div>
     </div>
@@ -717,6 +717,8 @@
           // Clone to remove old listeners
           const newConfirm = confirmBtn.cloneNode(true);
           const newCancel = cancelBtn.cloneNode(true);
+          newConfirm.textContent = t('yes_sure');
+          newCancel.textContent = t('cancel');
           confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
           cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
 
