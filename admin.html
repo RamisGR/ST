@@ -707,6 +707,7 @@
 
         function showConfirmModal(title, text, onConfirm) {
           const modal = document.getElementById('confirmModal');
+          document.getElementById('modalHeader').textContent = t('confirm_action');
           document.getElementById('modalTitle').textContent = title;
           document.getElementById('modalText').textContent = text;
           modal.classList.add('active');
