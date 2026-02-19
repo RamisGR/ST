@@ -311,6 +311,7 @@
                     </div>
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
                       <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; ${t('preview')}</button>
+                      <button onclick="shareTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#eef2ff; border-color:#6366f1; color:#4338ca;" title="${t('share')}">&#x21A9;</button>
                       <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; ${t('battle')}</button>
                       <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">${t('edit')}</button>
                       <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">${t('delete')}</button>
@@ -325,6 +326,16 @@
 
         window.previewTest = function (testId) {
           window.open('test.html?id=' + testId, '_blank');
+        };
+
+        window.shareTest = function (testId) {
+          const nextPath = 'test.html?id=' + testId;
+          const shareUrl = location.origin + location.pathname.replace(/admin\.html$/, 'index.html') + '?next=' + encodeURIComponent(nextPath);
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            Utils.showNotification(t('link_copied'), 'success');
+          }).catch(() => {
+            prompt('Copy this link:', shareUrl);
+          });
         };
 
         window.startBattle = function (testId) {
@@ -457,9 +468,10 @@
               </div>
             </div>
 
-            <h2 style="margin:40px 0 20px; color:#333;">
-              ${t('questions_count', te.questions.length)}
-            </h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin:40px 0 20px; flex-wrap:wrap;">
+              <h2 style="margin:0; color:#333;">${t('questions_count', te.questions.length)}</h2>
+              <button onclick="downloadCurrentTestXlsx()" class="btn btn-outline" style="color:var(--blue); border-color:var(--blue); background:#f0f9ff;">${t('download_xlsx')}</button>
+            </div>
 
             <div id="questionsList">
               ${te.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
@@ -469,7 +481,7 @@
               <button onclick="addQuestion()" class="btn btn-success" style="padding:12px 30px; font-size:1rem;">${t('add_question')}</button>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee;">
+            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee; flex-wrap:wrap;">
                <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">${t('discard')}</button>
                <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">${t('save_challenge')}</button>
             </div>
@@ -545,7 +557,7 @@
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
                          onchange="setCorrect(${qi}, ${oi})" style="width: 20px; height: 20px; accent-color: var(--green); cursor:pointer;">
                   <input type="text" class="form-control q-option" data-qi="${qi}" data-oi="${oi}"
-                         value="${Utils.escapeHtml(opt)}" placeholder="Option ${String.fromCharCode(65 + oi)}" style="border:1px solid ${q.correct === oi ? 'var(--green)' : '#ddd'};">
+                         value="${Utils.escapeHtml(opt)}" placeholder="${t('option_n', String.fromCharCode(65 + oi))}" style="border:1px solid ${q.correct === oi ? 'var(--green)' : '#ddd'};">
                 </div>
               `).join('')}
             </div>
@@ -796,6 +808,47 @@
         }
       };
 
+      window.downloadCurrentTestXlsx = function () {
+        const test = window._editingTestRef;
+        if (!test) return;
+
+        if (typeof XLSX === 'undefined') {
+          Utils.showNotification(t('excel_not_loaded'), 'error');
+          return;
+        }
+
+        const wb = XLSX.utils.book_new();
+        const rows = [
+          [test.title || ''],
+          ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct'],
+        ];
+
+        (test.questions || []).forEach((q) => {
+          const options = Array.isArray(q.options) ? q.options : [];
+          const padded = [
+            options[0] || '',
+            options[1] || '',
+            options[2] || '',
+            options[3] || '',
+          ];
+          const correctIdx = Number.isInteger(q.correct) ? q.correct : 0;
+          const boundedCorrect = Math.max(0, Math.min(3, correctIdx));
+          const correctLetter = String.fromCharCode(65 + boundedCorrect);
+          const correctValue = padded[boundedCorrect] || correctLetter;
+
+          rows.push([q.text || '', ...padded, correctValue]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Test');
+
+        const fileSafeTitle = (test.title || 'test')
+          .replace(/[\\/:*?"<>|]+/g, ' ')
+          .trim() || 'test';
+
+        XLSX.writeFile(wb, `${fileSafeTitle}.xlsx`);
+      };
+
       // ——— Excel Import (global) ———
       window.importFromExcel = function (input) {
         const file = input.files[0];
@@ -821,9 +874,9 @@
             // Row 1: test title (cell A1)
             const testTitle = String(rows[0][0] || '').trim() || 'Imported Test';
 
-            // Auto-detect if row 2 is a header row (column F is not a valid answer)
+            // Auto-detect if row 2 is a header row
             let startRow = 1;
-            if (rows[1] && !_isValidAnswer(String(rows[1][5] || ''))) {
+            if (_looksLikeHeaderRow(rows[1])) {
               startRow = 2;
             }
 
@@ -840,22 +893,14 @@
                 String(row[4] || '').trim(),
               ].filter(o => o);
 
-              if (options.length < 2) continue;
+              if (options.length < 1) continue;
 
-              const correctRaw = String(row[5] || '1').trim().toUpperCase();
-              let correct = 0;
-              if (['A', 'B', 'C', 'D'].includes(correctRaw)) {
-                correct = correctRaw.charCodeAt(0) - 65;
-              } else {
-                correct = Math.max(0, (parseInt(correctRaw) || 1) - 1);
-              }
-              correct = Math.min(correct, options.length - 1);
-
+              const correct = _resolveCorrectAnswer(row, options);
               questions.push({ id: Storage.generateId(), text, options, correct });
             }
 
             if (questions.length === 0) {
-              alert('No valid questions found.\n\nExpected format:\nRow 1: Test title (cell A1)\nRow 2: (optional header)\nRows 3+: Question | Option A | Option B | Option C | Option D | Correct (A/B/C/D or 1/2/3/4)');
+              alert('No valid questions found.\n\nExpected format:\nRow 1: Test title (cell A1)\nRow 2: (optional header)\nRows 3+: Question | Option A | Option B | Option C | Option D | Correct (A/B/C/D, 1/2/3/4, option text, or =B3/=C3/=D3/=E3).\nUse 1-4 filled option cells (B..E).');
               return;
             }
 
@@ -880,8 +925,39 @@
         reader.readAsArrayBuffer(file);
       };
 
-      function _isValidAnswer(val) {
-        return /^[ABCD1234]$/i.test(val.trim());
+      function _looksLikeHeaderRow(row) {
+        if (!row) return false;
+        const q = String(row[0] || '').trim().toLowerCase();
+        const c = String(row[5] || '').trim().toLowerCase();
+        return q === 'question' || q === 'вопрос' || c === 'correct' || c === 'верный' || c === 'правильный ответ';
+      }
+
+      function _resolveCorrectAnswer(row, options) {
+        const correctRaw = String(row[5] || '').trim();
+        if (!correctRaw) return 0;
+
+        const formulaMatch = correctRaw.match(/^=\s*([A-Z]+)\s*\d+$/i);
+        if (formulaMatch) {
+          const col = formulaMatch[1].toUpperCase();
+          const map = { B: 0, C: 1, D: 2, E: 3 };
+          if (Object.prototype.hasOwnProperty.call(map, col)) {
+            return Math.min(map[col], options.length - 1);
+          }
+        }
+
+        const upper = correctRaw.toUpperCase();
+        if (/^[A-D]$/.test(upper)) return Math.min(upper.charCodeAt(0) - 65, options.length - 1);
+        if (/^[1-4]$/.test(upper)) return Math.min(parseInt(upper, 10) - 1, options.length - 1);
+
+        const byExact = options.findIndex(o => o === correctRaw);
+        if (byExact >= 0) return byExact;
+
+        const normalize = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const normalized = normalize(correctRaw);
+        const byNorm = options.findIndex(o => normalize(o) === normalized);
+        if (byNorm >= 0) return byNorm;
+
+        return 0;
       }
 
       // Global Ctrl+V paste listener — inserts clipboard image into the last hovered question zone
