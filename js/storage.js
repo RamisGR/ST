@@ -14,12 +14,15 @@ const Storage = (() => {
     TESTS: 'ct_tests',
     RESULTS: 'ct_results',
     SESSIONS: 'ct_sessions',
+    FOLDERS: 'ct_folders',
+    BATTLE_RESULTS: 'ct_battle_results',
   };
 
   let db = null;
   let firebaseReady = false;
   let _onResultsChange = null; // callback for real-time leaderboard
   let _onTestsChange = null;
+  let _onFoldersChange = null;
 
   // ——— Firebase Init ———
   function initFirebase() {
@@ -40,6 +43,8 @@ const Storage = (() => {
       // Set up real-time listeners
       _listenTests();
       _listenResults();
+      _listenFolders();
+      _listenBattleResults();
     } catch (e) {
       console.warn('[TestArena] Firebase init failed, using offline mode:', e.message);
       firebaseReady = false;
@@ -75,6 +80,29 @@ const Storage = (() => {
 
   function onTestsChange(callback) {
     _onTestsChange = callback;
+  }
+
+  function _listenFolders() {
+    if (!firebaseReady) return;
+    db.ref('folders').on('value', (snapshot) => {
+      const data = snapshot.val();
+      const folders = data ? Object.values(data) : [];
+      localStorage.setItem(KEYS.FOLDERS, JSON.stringify(folders));
+      if (_onFoldersChange) _onFoldersChange(folders);
+    });
+  }
+
+  function onFoldersChange(callback) {
+    _onFoldersChange = callback;
+  }
+
+  function _listenBattleResults() {
+    if (!firebaseReady) return;
+    db.ref('battleResults').on('value', (snapshot) => {
+      const data = snapshot.val();
+      const results = data ? Object.values(data) : [];
+      localStorage.setItem(KEYS.BATTLE_RESULTS, JSON.stringify(results));
+    });
   }
 
   function isOnline() {
@@ -132,14 +160,18 @@ const Storage = (() => {
     return getTests().find(t => t.id === id) || null;
   }
 
+  function _normalizeFolderId(folderId) {
+    return folderId || null;
+  }
+
   function saveTest(test) {
     // Local
     const tests = getTests();
     const idx = tests.findIndex(t => t.id === test.id);
     if (idx >= 0) {
-      tests[idx] = test;
+      tests[idx] = { ...test, folderId: _normalizeFolderId(test.folderId) };
     } else {
-      tests.push(test);
+      tests.push({ ...test, folderId: _normalizeFolderId(test.folderId) });
     }
     localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
 
@@ -199,6 +231,86 @@ const Storage = (() => {
 
   function getUserResults(userName) {
     return getResults().filter(r => r.userName === userName);
+  }
+
+  // ——— Folders ———
+  function getFolders() {
+    const raw = localStorage.getItem(KEYS.FOLDERS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  function getFolder(id) {
+    return getFolders().find((f) => f.id === id) || null;
+  }
+
+  function saveFolder(folder) {
+    const folders = getFolders();
+    const normalized = {
+      id: folder.id || ('folder_' + generateId()),
+      name: folder.name || 'Folder',
+      color: folder.color || '#1368CE',
+      sortOrder: Number.isFinite(folder.sortOrder) ? folder.sortOrder : folders.length,
+      createdAt: folder.createdAt || Date.now(),
+      createdBy: folder.createdBy || '',
+    };
+    const idx = folders.findIndex((f) => f.id === normalized.id);
+    if (idx >= 0) folders[idx] = { ...folders[idx], ...normalized };
+    else folders.push(normalized);
+    localStorage.setItem(KEYS.FOLDERS, JSON.stringify(folders));
+    if (_onFoldersChange) _onFoldersChange(folders);
+
+    if (firebaseReady) db.ref('folders/' + normalized.id).set(normalized);
+    return normalized;
+  }
+
+  function deleteFolder(id) {
+    const folders = getFolders().filter((f) => f.id !== id);
+    localStorage.setItem(KEYS.FOLDERS, JSON.stringify(folders));
+    const tests = getTests().map((t) => (t.folderId === id ? { ...t, folderId: null } : t));
+    localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
+    if (_onFoldersChange) _onFoldersChange(folders);
+
+    if (firebaseReady) {
+      db.ref('folders/' + id).remove();
+      tests.filter((t) => !t.folderId).forEach((t) => db.ref('tests/' + t.id + '/folderId').set(null));
+    }
+  }
+
+  function getTestsInFolder(folderId) {
+    if (folderId === '__all__') return getTests();
+    if (folderId === '__unfiled__' || folderId == null) {
+      return getTests().filter((t) => !t.folderId);
+    }
+    return getTests().filter((t) => t.folderId === folderId);
+  }
+
+  function moveTestToFolder(testId, folderId) {
+    const test = getTest(testId);
+    if (!test) return null;
+    const updated = { ...test, folderId: _normalizeFolderId(folderId) };
+    saveTest(updated);
+    return updated;
+  }
+
+  // ——— Battle Results snapshots ———
+  function getBattleResults() {
+    const raw = localStorage.getItem(KEYS.BATTLE_RESULTS);
+    return raw ? JSON.parse(raw) : [];
+  }
+
+  function getBattleResultsForTest(testId) {
+    return getBattleResults().filter((r) => r.testId === testId);
+  }
+
+  function saveBattleResult(result) {
+    const results = getBattleResults();
+    const normalized = { ...result, id: result.id || ('br_' + generateId()) };
+    const idx = results.findIndex((r) => r.id === normalized.id);
+    if (idx >= 0) results[idx] = normalized;
+    else results.push(normalized);
+    localStorage.setItem(KEYS.BATTLE_RESULTS, JSON.stringify(results));
+    if (firebaseReady) db.ref('battleResults/' + normalized.id).set(normalized);
+    return normalized;
   }
 
   // ——— Live Sessions (who is currently taking a test) ———
@@ -262,11 +374,15 @@ const Storage = (() => {
     localStorage.removeItem(KEYS.TESTS);
     localStorage.removeItem(KEYS.RESULTS);
     localStorage.removeItem(KEYS.SESSIONS);
+    localStorage.removeItem(KEYS.FOLDERS);
+    localStorage.removeItem(KEYS.BATTLE_RESULTS);
     localStorage.removeItem('ct_admin_password');
     if (firebaseReady) {
       db.ref('tests').remove();
       db.ref('results').remove();
       db.ref('sessions').remove();
+      db.ref('folders').remove();
+      db.ref('battleResults').remove();
     }
   }
 
@@ -403,10 +519,14 @@ const Storage = (() => {
     isOnline,
     onResultsChange,
     onTestsChange,
+    onFoldersChange,
     onSessionsChange,
     getUser, setUser, clearUser, logout,
     getTests, getTest, saveTest, deleteTest,
+    getFolders, getFolder, saveFolder, deleteFolder,
+    getTestsInFolder, moveTestToFolder,
     getResults, getResultsForTest, saveResult, getUserResults,
+    getBattleResults, getBattleResultsForTest, saveBattleResult,
     getSessions, saveSession, removeSession, clearSessions,
     clearAllResults, resetAllData,
     generateId,
