@@ -545,7 +545,7 @@
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
                          onchange="setCorrect(${qi}, ${oi})" style="width: 20px; height: 20px; accent-color: var(--green); cursor:pointer;">
                   <input type="text" class="form-control q-option" data-qi="${qi}" data-oi="${oi}"
-                         value="${Utils.escapeHtml(opt)}" placeholder="Option ${String.fromCharCode(65 + oi)}" style="border:1px solid ${q.correct === oi ? 'var(--green)' : '#ddd'};">
+                         value="${Utils.escapeHtml(opt)}" placeholder="${t('option_n', String.fromCharCode(65 + oi))}" style="border:1px solid ${q.correct === oi ? 'var(--green)' : '#ddd'};">
                 </div>
               `).join('')}
             </div>
