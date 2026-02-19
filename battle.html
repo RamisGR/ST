@@ -670,13 +670,17 @@
           </div>
         `;
 
-        document.getElementById('copyLinkBtn').addEventListener('click', function () {
-          navigator.clipboard.writeText(joinUrl).then(() => {
-            this.textContent = t('copied');
-            setTimeout(() => { this.innerHTML = t('copy_link'); }, 2000);
-          }).catch(() => {
-            prompt('Copy this link:', joinUrl);
-          });
+        document.getElementById('copyLinkBtn').addEventListener('click', async function () {
+          if (navigator.share) {
+            try {
+              await navigator.share({ url: joinUrl, title: t('scan_to_join') });
+            } catch (e) { /* user cancelled */ }
+          } else {
+            navigator.clipboard.writeText(joinUrl).then(() => {
+              this.textContent = t('copied');
+              setTimeout(() => { this.innerHTML = t('copy_link'); }, 2000);
+            }).catch(() => { prompt('Copy this link:', joinUrl); });
+          }
         });
 
         if (isCreator) {
