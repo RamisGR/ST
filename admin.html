@@ -602,11 +602,11 @@
           renderEditor();
         };
         window.saveTest = function () {
-          const t = editingTest;
-          if (!t.title.trim()) { Utils.showNotification(t('title_required'), 'error'); return; }
-          if (t.questions.some(q => !q.text.trim())) { Utils.showNotification(t('empty_questions'), 'error'); return; }
-          if (t.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification(t('empty_options'), 'error'); return; }
-          Storage.saveTest(t);
+          const test = editingTest;
+          if (!test.title.trim()) { Utils.showNotification(t('title_required'), 'error'); return; }
+          if (test.questions.some(q => !q.text.trim())) { Utils.showNotification(t('empty_questions'), 'error'); return; }
+          if (test.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification(t('empty_options'), 'error'); return; }
+          Storage.saveTest(test);
           Utils.showNotification(t('saved_notif'), 'success');
           editingTest = null;
           currentTab = 'tests';
