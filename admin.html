@@ -311,7 +311,7 @@
                     </div>
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
                       <button onclick="previewTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#f0f9ff; border-color:var(--blue); color:var(--blue);">&#9654; ${t('preview')}</button>
-                      <button onclick="shareTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#eef2ff; border-color:#6366f1; color:#4338ca;" title="${t('share')}">&#x21AA;</button>
+                      <button onclick="shareTest('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#eef2ff; border-color:#6366f1; color:#4338ca;">&#x1F517; ${t('share')}</button>
                       <button onclick="startBattle('${test.id}')" class="btn btn-outline" style="padding:8px 15px; background:#fff8e1; border-color:#f59e0b; color:#b45309;">&#9876; ${t('battle')}</button>
                       <button onclick="editTest('${test.id}')" class="btn btn-outline" style="padding: 8px 15px;">${t('edit')}</button>
                       <button onclick="confirmDeleteTest('${test.id}', '${Utils.escapeHtml(test.title).replace(/'/g, "\\'")}')" class="btn btn-danger" style="padding: 8px 15px;">${t('delete')}</button>
