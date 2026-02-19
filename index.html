@@ -125,10 +125,19 @@
     // Set page lang attribute
     document.documentElement.lang = getLang();
 
+    const nextPath = Utils.getQueryParam('next');
+
+    function resolveNextUrl() {
+      if (!nextPath) return 'tests.html';
+      if (nextPath.startsWith('http://') || nextPath.startsWith('https://') || nextPath.startsWith('//')) return 'tests.html';
+      if (nextPath.includes('..')) return 'tests.html';
+      return nextPath;
+    }
+
     // Check if logged in
     const user = Storage.getUser();
     if (user) {
-      window.location.href = 'tests.html';
+      window.location.href = resolveNextUrl();
     }
 
     // Render i18n strings
@@ -151,7 +160,7 @@
 
       if (name) {
         Storage.setUser({ name, group, role: 'student' });
-        window.location.href = 'tests.html';
+        window.location.href = resolveNextUrl();
       }
     });
 

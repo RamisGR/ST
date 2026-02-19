@@ -43,7 +43,8 @@ const Utils = (() => {
   function requireAuth() {
     const user = Storage.getUser();
     if (!user) {
-      window.location.href = 'index.html';
+      const next = window.location.pathname.split('/').pop() + window.location.search;
+      window.location.href = 'index.html?next=' + encodeURIComponent(next);
       return null;
     }
     return user;
