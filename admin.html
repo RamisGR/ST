@@ -469,7 +469,8 @@
               <button onclick="addQuestion()" class="btn btn-success" style="padding:12px 30px; font-size:1rem;">${t('add_question')}</button>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee;">
+            <div style="display:flex; justify-content:flex-end; gap:15px; margin-top:24px; padding-top: 20px; border-top: 2px solid #eee; flex-wrap:wrap;">
+               <button onclick="downloadCurrentTestXlsx()" class="btn btn-outline" style="color:var(--blue); border-color:var(--blue); background:#f0f9ff;">${t('download_xlsx')}</button>
                <button onclick="switchTab('tests')" class="btn btn-outline" style="color:#666; border-color:#ccc;">${t('discard')}</button>
                <button onclick="saveTest()" class="btn btn-primary" style="padding:12px 30px; font-size:1.1rem;">${t('save_challenge')}</button>
             </div>
@@ -794,6 +795,45 @@
           editingTest.questions[qi].imageUrl = null;
           if (window._rerenderEditor) window._rerenderEditor();
         }
+      };
+
+      window.downloadCurrentTestXlsx = function () {
+        const test = window._editingTestRef;
+        if (!test) return;
+
+        if (typeof XLSX === 'undefined') {
+          Utils.showNotification(t('excel_not_loaded'), 'error');
+          return;
+        }
+
+        const wb = XLSX.utils.book_new();
+        const rows = [
+          [test.title || ''],
+          ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct'],
+        ];
+
+        (test.questions || []).forEach((q) => {
+          const options = Array.isArray(q.options) ? q.options : [];
+          const padded = [
+            options[0] || '',
+            options[1] || '',
+            options[2] || '',
+            options[3] || '',
+          ];
+          const correctIdx = Number.isInteger(q.correct) ? q.correct : 0;
+          const correctLetter = String.fromCharCode(65 + Math.max(0, Math.min(3, correctIdx)));
+
+          rows.push([q.text || '', ...padded, correctLetter]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Test');
+
+        const fileSafeTitle = (test.title || 'test')
+          .replace(/[\\/:*?"<>|]+/g, ' ')
+          .trim() || 'test';
+
+        XLSX.writeFile(wb, `${fileSafeTitle}.xlsx`);
       };
 
       // ——— Excel Import (global) ———
