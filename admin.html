@@ -396,6 +396,11 @@
           };
         }
 
+        function getQuestionOptionsForEditor(question) {
+          const source = Array.isArray(question.options) ? question.options : [];
+          return [0, 1, 2, 3].map(i => String(source[i] || ''));
+        }
+
         function renderEditor() {
           if (!editingTest) return;
           // Expose references so global image-upload handlers can access closure state
@@ -556,7 +561,7 @@
             </div>
             ${imgSection}
             <div class="options-editor" style="margin-top:16px;">
-              ${q.options.map((opt, oi) => `
+              ${getQuestionOptionsForEditor(q).map((opt, oi) => `
                 <div class="option-row">
                   <input type="radio" name="correct_${qi}" value="${oi}" ${q.correct === oi ? 'checked' : ''}
                          onchange="setCorrect(${qi}, ${oi})" style="width: 20px; height: 20px; accent-color: var(--green); cursor:pointer;">
@@ -605,7 +610,29 @@
           const test = editingTest;
           if (!test.title.trim()) { Utils.showNotification(t('title_required'), 'error'); return; }
           if (test.questions.some(q => !q.text.trim())) { Utils.showNotification(t('empty_questions'), 'error'); return; }
-          if (test.questions.some(q => q.options.some(o => !o.trim()))) { Utils.showNotification(t('empty_options'), 'error'); return; }
+
+          const normalizedQuestions = test.questions.map((q) => {
+            const normalizedOptions = getQuestionOptionsForEditor(q)
+              .map(o => o.trim())
+              .filter(Boolean);
+
+            const boundedCorrect = normalizedOptions.length > 0
+              ? Math.max(0, Math.min(Number(q.correct) || 0, normalizedOptions.length - 1))
+              : 0;
+
+            return {
+              ...q,
+              options: normalizedOptions,
+              correct: boundedCorrect,
+            };
+          });
+
+          if (normalizedQuestions.some(q => q.options.length < 1)) {
+            Utils.showNotification(t('empty_options'), 'error');
+            return;
+          }
+
+          test.questions = normalizedQuestions;
           Storage.saveTest(test);
           Utils.showNotification(t('saved_notif'), 'success');
           editingTest = null;
