@@ -162,9 +162,9 @@
 
       function showAdminLogin() {
         document.getElementById('app').innerHTML = `
-          <div class="fade-in" style="text-align:center; max-width:400px; width:90%; margin:0 auto;">
-            <h1 style="font-size:clamp(2rem, 5vw, 3rem); margin-bottom:10px; color:white; text-shadow:0 4px 0 rgba(0,0,0,0.2);">${t('game_master')}</h1>
-            <p style="color:rgba(255,255,255,0.7); margin-bottom:30px; font-weight:700;">${t('console_access')}</p>
+          <div class="fade-in" style="text-align:center; max-width:420px; width:90%; margin:0 auto;">
+            <h1 style="font-size:clamp(1.6rem, 4vw, 2.4rem); margin-bottom:10px; color:white; text-shadow:0 4px 0 rgba(0,0,0,0.2); word-break:break-word; overflow-wrap:anywhere; line-height:1.2;">${t('game_master')}</h1>
+            <p style="color:rgba(255,255,255,0.7); margin-bottom:30px; font-weight:700; font-size:0.95rem; word-break:break-word; overflow-wrap:anywhere;">${t('console_access')}</p>
             
             <div class="card" style="border-top:12px solid var(--yellow); padding:30px; text-align:left;">
                 <div class="form-group">
@@ -386,23 +386,23 @@
           // Expose references so global image-upload handlers can access closure state
           window._editingTestRef = editingTest;
           window._rerenderEditor = renderEditor;
-          const t = editingTest;
-          if (!t.battleSettings) t.battleSettings = { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432', showCorrectAnswer: true, showPlayerCount: true };
-          const bs = t.battleSettings;
+          const te = editingTest;
+          if (!te.battleSettings) te.battleSettings = { perQuestionMode: false, perQuestionTime: 20, ratingDuration: 4, chartType: 'vertical-bar', ratingTitle: '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432', showCorrectAnswer: true, showPlayerCount: true };
+          const bs = te.battleSettings;
           document.getElementById('tabContent').innerHTML = `
           <div class="editor-section">
             <h2 style="margin-bottom:20px; color:#333;">${t('challenge_settings')}</h2>
             <div class="form-group">
               <label>${t('title')}</label>
-              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(t.title)}" placeholder="${t('placeholder_title')}" style="font-weight:700;">
+              <input type="text" id="testTitle" class="form-control" value="${Utils.escapeHtml(te.title)}" placeholder="${t('placeholder_title')}" style="font-weight:700;">
             </div>
             <div class="form-group">
               <label>${t('description')}</label>
-              <textarea id="testDesc" class="form-control" rows="2" placeholder="${t('placeholder_desc')}">${Utils.escapeHtml(t.description || '')}</textarea>
+              <textarea id="testDesc" class="form-control" rows="2" placeholder="${t('placeholder_desc')}">${Utils.escapeHtml(te.description || '')}</textarea>
             </div>
             <div class="form-group">
               <label>${t('time_limit_classic')}</label>
-              <input type="number" id="testTime" class="form-control" value="${t.timeLimit}" min="30" max="7200" style="max-width:150px;">
+              <input type="number" id="testTime" class="form-control" value="${te.timeLimit}" min="30" max="7200" style="max-width:150px;">
             </div>
 
             <!-- Battle Settings -->
@@ -450,19 +450,19 @@
                   </div>
                 </div>
                 <p style="color:#888; font-size:0.8rem; margin-top:15px;">
-                  \u2139\ufe0f \u041f\u0440\u0438\u043c\u0435\u0440: \u0442\u0435\u0441\u0442 \u0438\u0437 ${t.questions.length} \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u0432 \u0437\u0430\u0439\u043c\u0451\u0442
-                  <strong>${Math.ceil((t.questions.length * (bs.perQuestionTime + bs.ratingDuration)) / 60)} \u043c\u0438\u043d.</strong>
-                  (${t.questions.length}×${bs.perQuestionTime}\u0441 + ${t.questions.length}×${bs.ratingDuration}\u0441 \u0440\u0435\u0439\u0442\u0438\u043d\u0433)
+                  \u2139\ufe0f \u041f\u0440\u0438\u043c\u0435\u0440: \u0442\u0435\u0441\u0442 \u0438\u0437 ${te.questions.length} \u0432\u043e\u043f\u0440\u043e\u0441\u043e\u0432 \u0437\u0430\u0439\u043c\u0451\u0442
+                  <strong>${Math.ceil((te.questions.length * (bs.perQuestionTime + bs.ratingDuration)) / 60)} \u043c\u0438\u043d.</strong>
+                  (${te.questions.length}×${bs.perQuestionTime}\u0441 + ${te.questions.length}×${bs.ratingDuration}\u0441 \u0440\u0435\u0439\u0442\u0438\u043d\u0433)
                 </p>
               </div>
             </div>
 
             <h2 style="margin:40px 0 20px; color:#333;">
-              ${t('questions_count', t.questions.length)}
+              ${t('questions_count', te.questions.length)}
             </h2>
 
             <div id="questionsList">
-              ${t.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
+              ${te.questions.map((q, qi) => renderQuestionEditor(q, qi)).join('')}
             </div>
 
             <div style="text-align:center; margin:24px 0 8px;">

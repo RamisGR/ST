@@ -397,7 +397,7 @@ function t(key) {
  */
 function renderLangSwitcher() {
   const lang = getLang();
-  const flag = lang === 'ru' ? '🇷🇺' : '🇬🇧';
+  const flag = lang === 'ru' ? '🇷🇺' : 'EN';
   const next = lang === 'ru' ? 'en' : 'ru';
   return `<button onclick="setLang('${next}')" title="${lang === 'ru' ? 'Switch to English' : 'Переключить на русский'}"
     style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white;

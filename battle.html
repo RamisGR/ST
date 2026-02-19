@@ -578,46 +578,55 @@
         const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=' + encodeURIComponent(joinUrl) + '&margin=10&format=png';
 
         document.getElementById('app').innerHTML = `
-          <div class="container fade-in" style="text-align:center; padding-top:40px;">
-             ${isObserver ? `<div style="display:inline-block; font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; margin-bottom:18px;">${t('observer_mode')}</div>` : ''}
+          <div class="fade-in" style="display:flex; flex-direction:column; height:calc(100vh - 60px); max-width:1600px; margin:0 auto; padding:16px 24px; box-sizing:border-box; gap:16px;">
 
-             <div class="pin-card">
-               <div style="font-size:1rem; color:#888; font-weight:800; text-transform:uppercase;">${t('game_pin')}</div>
-                <div style="font-size:clamp(2.2rem,13vw,5rem); font-weight:900; letter-spacing:clamp(3px,2vw,8px); line-height:1; font-family:var(--font-display);">${roomCode}</div>
+            ${isObserver ? `<div style="text-align:center;"><div style="display:inline-block; font-size:0.72rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px;">${t('observer_mode')}</div></div>` : ''}
 
-               <div style="margin-top:22px; display:flex; flex-direction:column; align-items:center; gap:12px;">
-                 <img src="${qrSrc}" alt="QR" style="width:min(420px,80vw); height:min(420px,80vw); border-radius:20px; box-shadow:0 8px 32px rgba(0,0,0,0.22); display:block;">
-                 <span style="font-size:0.78rem; color:#aaa; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;">${t('scan_to_join')}</span>
-                 <button id="copyLinkBtn" style="margin-top:4px; background:var(--blue); color:white; border:none; border-radius:12px; padding:12px 28px; font-weight:800; font-size:1rem; cursor:pointer; box-shadow:0 4px 0 var(--blue-shadow);">${t('copy_link')}</button>
-               </div>
-             </div>
+            <!-- Main 2-column area -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; flex:1; min-height:0; overflow:hidden;">
 
-             <h2 style="color:white; margin-bottom:40px; font-size:2.2rem; text-shadow:0 2px 0 rgba(0,0,0,0.2);">${t('waiting_players')}</h2>
-             
-             <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:30px; margin-bottom:60px; min-height:150px;">
-               ${players.map((p, i) => `
-                 <div class="avatar-bounce" style="text-align:center; animation-delay:${i * 0.1}s;">
-                   <div class="avatar" style="width:80px; height:80px; font-size:2rem; background:white; color:#333; margin:0 auto 10px; border:4px solid white; box-shadow:0 6px 0 rgba(0,0,0,0.2);">
-                     ${p.name.charAt(0).toUpperCase()}
-                   </div>
-                   <div class="player-pill">
-                     ${Utils.escapeHtml(p.name)}
-                   </div>
-                 </div>
-               `).join('')}
-             </div>
+              <!-- LEFT: QR + PIN + Copy button -->
+              <div class="pin-card" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:12px; overflow:hidden;">
+                <div style="font-size:0.9rem; color:#888; font-weight:800; text-transform:uppercase; letter-spacing:2px;">${t('game_pin')}</div>
+                <div style="font-size:clamp(2rem,8vw,4rem); font-weight:900; letter-spacing:clamp(3px,2vw,8px); line-height:1; font-family:var(--font-display);">${roomCode}</div>
+                <img src="${qrSrc}" alt="QR" style="width:min(380px,36vw,55vh); height:min(380px,36vw,55vh); border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.22); display:block; flex-shrink:0;">
+                <span style="font-size:0.78rem; color:#aaa; font-weight:700; text-transform:uppercase; letter-spacing:1.5px;">${t('scan_to_join')}</span>
+                <button id="copyLinkBtn" style="background:var(--blue); color:white; border:none; border-radius:12px; padding:12px 32px; font-weight:800; font-size:1rem; cursor:pointer; box-shadow:0 4px 0 var(--blue-shadow); width:100%; max-width:280px;">${t('copy_link')}</button>
+              </div>
 
-             <div style="color:rgba(255,255,255,0.8); font-weight:800; font-size:1.8rem; margin-bottom:40px;">
-               ${players.length} ${t('players_ready')}
-             </div>
+              <!-- RIGHT: Players list -->
+              <div style="display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+                <h2 style="color:white; font-size:clamp(1.2rem,2.5vw,1.8rem); text-shadow:0 2px 0 rgba(0,0,0,0.2); margin:0; text-align:center; flex-shrink:0;">${t('waiting_players')}</h2>
+                <div style="color:rgba(255,255,255,0.8); font-weight:800; font-size:1.3rem; text-align:center; flex-shrink:0;">
+                  ${players.length} ${t('players_ready')}
+                </div>
+                <div style="flex:1; overflow-y:auto; display:flex; flex-wrap:wrap; align-content:flex-start; justify-content:center; gap:16px; padding:8px;">
+                  ${players.map((p, i) => `
+                    <div class="avatar-bounce" style="text-align:center; animation-delay:${i * 0.1}s;">
+                      <div class="avatar" style="width:64px; height:64px; font-size:1.6rem; background:white; color:#333; margin:0 auto 8px; border:3px solid white; box-shadow:0 4px 0 rgba(0,0,0,0.2);">
+                        ${p.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div class="player-pill" style="font-size:0.8rem; padding:4px 10px;">
+                        ${Utils.escapeHtml(p.name)}
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
 
-             ${isCreator ? `
-               <button id="startBtn" class="btn btn-primary" style="font-size:2rem; padding:24px 80px; box-shadow: 0 10px 0 var(--blue-shadow); border-radius:var(--radius-lg);">${t('start_game')}</button>
-             ` : `
-               <div style="color:white; font-size:1.4rem; background:rgba(0,0,0,0.3); padding:20px 40px; border-radius:40px; display:inline-block; backdrop-filter:blur(10px);">
-                 ${t('host_starting')}
-               </div>
-             `}
+            </div>
+
+            <!-- BOTTOM: Start game button (centered) -->
+            <div style="text-align:center; flex-shrink:0; padding-bottom:8px;">
+              ${isCreator ? `
+                <button id="startBtn" class="btn btn-primary" style="font-size:1.6rem; padding:18px 80px; box-shadow:0 8px 0 var(--blue-shadow); border-radius:var(--radius-lg);">${t('start_game')}</button>
+              ` : `
+                <div style="color:white; font-size:1.2rem; background:rgba(0,0,0,0.3); padding:16px 40px; border-radius:40px; display:inline-block; backdrop-filter:blur(10px);">
+                  ${t('host_starting')}
+                </div>
+              `}
+            </div>
+
           </div>
         `;
 
