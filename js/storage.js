@@ -14,12 +14,46 @@ const Storage = (() => {
     TESTS: 'ct_tests',
     RESULTS: 'ct_results',
     SESSIONS: 'ct_sessions',
+    BATTLES: 'ct_battles',
   };
 
   let db = null;
   let firebaseReady = false;
   let _onResultsChange = null; // callback for real-time leaderboard
   let _onTestsChange = null;
+  const _battleListeners = new Map();
+
+  function _getBattlesMap() {
+    const raw = localStorage.getItem(KEYS.BATTLES);
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  function _saveBattlesMap(map) {
+    localStorage.setItem(KEYS.BATTLES, JSON.stringify(map));
+  }
+
+  function _getBattle(roomCode) {
+    const map = _getBattlesMap();
+    return map[roomCode] || null;
+  }
+
+  function _setBattle(roomCode, battle) {
+    const map = _getBattlesMap();
+    if (battle) map[roomCode] = battle;
+    else delete map[roomCode];
+    _saveBattlesMap(map);
+
+    const listeners = _battleListeners.get(roomCode) || [];
+    listeners.forEach(cb => cb(map[roomCode] || null));
+  }
+
+  function _patchBattle(roomCode, patch) {
+    const current = _getBattle(roomCode);
+    if (!current) return null;
+    const next = { ...current, ...patch };
+    _setBattle(roomCode, next);
+    return next;
+  }
 
   // ——— Firebase Init ———
   function initFirebase() {
@@ -262,11 +296,13 @@ const Storage = (() => {
     localStorage.removeItem(KEYS.TESTS);
     localStorage.removeItem(KEYS.RESULTS);
     localStorage.removeItem(KEYS.SESSIONS);
+    localStorage.removeItem(KEYS.BATTLES);
     localStorage.removeItem('ct_admin_password');
     if (firebaseReady) {
       db.ref('tests').remove();
       db.ref('results').remove();
       db.ref('sessions').remove();
+      db.ref('battles').remove();
     }
   }
 
@@ -306,6 +342,7 @@ const Storage = (() => {
     if (firebaseReady) {
       db.ref('battles/' + roomCode).set(battle);
     }
+    _setBattle(roomCode, battle);
     return battle;
   }
 
@@ -327,6 +364,12 @@ const Storage = (() => {
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
     }
+    const room = _getBattle(roomCode);
+    if (room) {
+      room.players = room.players || {};
+      room.players[playerId] = player;
+      _setBattle(roomCode, room);
+    }
     return playerId;
   }
 
@@ -334,11 +377,23 @@ const Storage = (() => {
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId).update(data);
     }
+    const room = _getBattle(roomCode);
+    if (room && room.players && room.players[playerId]) {
+      room.players[playerId] = { ...room.players[playerId], ...data };
+      _setBattle(roomCode, room);
+    }
   }
 
   function saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex) {
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex).set(answerIndex);
+    }
+    const room = _getBattle(roomCode);
+    if (room && room.players && room.players[playerId]) {
+      const answers = { ...(room.players[playerId].answers || {}) };
+      answers[questionIndex] = answerIndex;
+      room.players[playerId] = { ...room.players[playerId], answers };
+      _setBattle(roomCode, room);
     }
   }
 
@@ -346,45 +401,73 @@ const Storage = (() => {
     if (firebaseReady) {
       db.ref('battles/' + roomCode).update(data);
     }
+    _patchBattle(roomCode, data);
   }
 
   function startBattle(roomCode) {
+    _patchBattle(roomCode, {
+      status: 'countdown',
+      startedAt: Date.now(),
+    });
+
     if (firebaseReady) {
       db.ref('battles/' + roomCode).update({
         status: 'countdown',
         startedAt: Date.now(),
       });
-      // After 4 seconds, set status to active (3-2-1-GO)
-      setTimeout(() => {
-        db.ref('battles/' + roomCode + '/status').set('active');
-      }, 4000);
     }
+
+    // After 4 seconds, set status to active (3-2-1-GO)
+    setTimeout(() => {
+      _patchBattle(roomCode, { status: 'active' });
+      if (firebaseReady) {
+        db.ref('battles/' + roomCode + '/status').set('active');
+      }
+    }, 4000);
   }
 
   function finishBattle(roomCode) {
+    _patchBattle(roomCode, { status: 'finished' });
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/status').set('finished');
     }
   }
 
   function onBattleChange(roomCode, callback) {
-    if (!firebaseReady) return null;
+    const listeners = _battleListeners.get(roomCode) || [];
+    listeners.push(callback);
+    _battleListeners.set(roomCode, listeners);
+
+    callback(_getBattle(roomCode));
+
+    if (!firebaseReady) return { roomCode, callback, firebaseRef: null };
     const ref = db.ref('battles/' + roomCode);
     ref.on('value', (snapshot) => {
       const data = snapshot.val();
-      callback(data);
+      if (data) {
+        _setBattle(roomCode, data);
+        return;
+      }
+      callback(_getBattle(roomCode));
     });
-    return ref;
+    return { roomCode, callback, firebaseRef: ref };
   }
 
   function offBattleChange(ref) {
-    if (ref) ref.off();
+    if (!ref) return;
+
+    const listeners = _battleListeners.get(ref.roomCode) || [];
+    _battleListeners.set(ref.roomCode, listeners.filter(cb => cb !== ref.callback));
+
+    if (ref.firebaseRef) ref.firebaseRef.off();
   }
 
   function getBattleOnce(roomCode, callback) {
-    if (!firebaseReady) { callback(null); return; }
+    if (!firebaseReady) { callback(_getBattle(roomCode)); return; }
     db.ref('battles/' + roomCode).once('value', (snapshot) => {
-      callback(snapshot.val());
+      const data = snapshot.val();
+      if (data) _setBattle(roomCode, data);
+      callback(data || _getBattle(roomCode));
     });
   }
 
