@@ -317,6 +317,18 @@ const Storage = (() => {
   function createBattle(testId, testTitle, questionsCount, timeLimit, creatorName) {
     const roomCode = generateRoomCode();
     const test = getTest(testId);
+    const sourceSettings = (test && test.battleSettings) || {};
+    const battleSettings = {
+      ...sourceSettings,
+      // Battle room must run in per-question competitive flow
+      perQuestionMode: true,
+      perQuestionTime: sourceSettings.perQuestionTime || 20,
+      ratingDuration: sourceSettings.ratingDuration || 4,
+      chartType: sourceSettings.chartType || 'vertical-bar',
+      ratingTitle: sourceSettings.ratingTitle || 'Распределение ответов',
+      showCorrectAnswer: sourceSettings.showCorrectAnswer !== false,
+      showPlayerCount: sourceSettings.showPlayerCount !== false,
+    };
     const battle = {
       id: roomCode,
       testId,
@@ -329,15 +341,7 @@ const Storage = (() => {
       startedAt: null,
       currentQuestion: 0,
       players: {},
-      battleSettings: test && test.battleSettings ? test.battleSettings : {
-        perQuestionMode: false,
-        perQuestionTime: 20,
-        ratingDuration: 4,
-        chartType: 'vertical-bar',
-        ratingTitle: 'Распределение ответов',
-        showCorrectAnswer: true,
-        showPlayerCount: true,
-      },
+      battleSettings,
     };
     if (firebaseReady) {
       db.ref('battles/' + roomCode).set(battle);
