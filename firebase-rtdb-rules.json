@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "tests": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "results": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["testId", "userName", "score"]
+    },
+    "sessions": {
+      ".read": true,
+      ".write": true
+    },
+    "battles": {
+      ".read": true,
+      "$room": {
+        "players": {
+          "$playerId": {
+            ".write": "root.child('battles').child($room).child('status').val() === 'waiting'"
+          }
+        }
+      }
+    }
+  }
+}
