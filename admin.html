@@ -343,7 +343,7 @@
 
       // ——— Settings ———
       function renderSettings() {
-        const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
+        const currentPassword = Storage.getAdminPassword();
         document.getElementById('tabContent').innerHTML = `
           <div class="card" style="max-width:500px;">
             <div class="card-header">Настройки</div>
@@ -367,7 +367,7 @@
           Utils.showNotification('Пароль не может быть пустым', 'error');
           return;
         }
-        localStorage.setItem('ct_admin_password', pass);
+        Storage.setAdminPassword(pass);
         Utils.showNotification('Настройки сохранены!', 'success');
       };
 

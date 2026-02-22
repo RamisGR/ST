@@ -14,7 +14,13 @@ const Storage = (() => {
     TESTS: 'ct_tests',
     RESULTS: 'ct_results',
     SESSIONS: 'ct_sessions',
+    ADMIN_PASSWORD: 'ct_admin_password',
+    AUTH_VERSION: 'ct_auth_version',
   };
+
+  const ADMIN_PASSWORD = 'Ramis509admin!';
+  const SESSION_VERSION = 2;
+  const AUTH_VERSION = 2;
 
   let db = null;
   let firebaseReady = false;
@@ -81,18 +87,48 @@ const Storage = (() => {
     return firebaseReady;
   }
 
+
+  function ensureSecurityUpdate() {
+    const currentVersion = Number(localStorage.getItem(KEYS.AUTH_VERSION) || 0);
+    if (currentVersion >= AUTH_VERSION) return;
+    localStorage.setItem(KEYS.ADMIN_PASSWORD, ADMIN_PASSWORD);
+    localStorage.removeItem(KEYS.USER);
+    localStorage.setItem(KEYS.AUTH_VERSION, String(AUTH_VERSION));
+  }
+
   // ——— User (always local only) ———
   function getUser() {
+    ensureSecurityUpdate();
     const raw = localStorage.getItem(KEYS.USER);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    if (user.sessionVersion !== SESSION_VERSION) {
+      localStorage.removeItem(KEYS.USER);
+      return null;
+    }
+    return user;
   }
 
   function setUser(user) {
-    localStorage.setItem(KEYS.USER, JSON.stringify(user));
+    ensureSecurityUpdate();
+    localStorage.setItem(KEYS.USER, JSON.stringify({
+      ...user,
+      sessionVersion: SESSION_VERSION,
+    }));
   }
 
   function clearUser() {
     localStorage.removeItem(KEYS.USER);
+  }
+
+  function getAdminPassword() {
+    ensureSecurityUpdate();
+    const savedPassword = localStorage.getItem(KEYS.ADMIN_PASSWORD);
+    return savedPassword || ADMIN_PASSWORD;
+  }
+
+  function setAdminPassword(password) {
+    localStorage.setItem(KEYS.ADMIN_PASSWORD, password);
   }
 
   // ——— Tests ———
@@ -257,7 +293,7 @@ const Storage = (() => {
     localStorage.removeItem(KEYS.TESTS);
     localStorage.removeItem(KEYS.RESULTS);
     localStorage.removeItem(KEYS.SESSIONS);
-    localStorage.removeItem('ct_admin_password');
+    localStorage.removeItem(KEYS.ADMIN_PASSWORD);
     if (firebaseReady) {
       db.ref('tests').remove();
       db.ref('results').remove();
@@ -377,6 +413,7 @@ const Storage = (() => {
     onTestsChange,
     onSessionsChange,
     getUser, setUser, clearUser,
+    getAdminPassword, setAdminPassword,
     getTests, getTest, saveTest, deleteTest,
     getResults, getResultsForTest, saveResult, getUserResults,
     getSessions, saveSession, removeSession, clearSessions,

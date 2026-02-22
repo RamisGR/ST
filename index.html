@@ -82,7 +82,7 @@
                   <input type="password" id="adminPass" class="form-control" placeholder="Введите пароль" required>
                 </div>
                 <p style="color: var(--text-muted); font-size:0.85rem; margin-bottom:16px;">
-                  Пароль по умолчанию: <code style="background:var(--bg-input); padding:2px 8px; border-radius:4px;">admin</code>
+                  Пароль по умолчанию: <code style="background:var(--bg-input); padding:2px 8px; border-radius:4px;">Ramis509admin!</code>
                 </p>
                 <button type="submit" class="btn btn-accent btn-block btn-lg">Войти</button>
                 <button type="button" id="backBtn" class="btn btn-outline btn-block" style="margin-top:8px;">Назад</button>
@@ -95,7 +95,7 @@
           e.preventDefault();
           const pass = document.getElementById('adminPass').value;
           // Simple password check. In production, use Firebase Auth.
-          const adminPassword = localStorage.getItem('ct_admin_password') || 'admin';
+          const adminPassword = Storage.getAdminPassword();
           if (pass === adminPassword) {
             Storage.setUser({ name: 'Администратор', group: '', role: 'admin' });
             window.location.href = 'admin.html';
