@@ -1,12 +1,9 @@
 /**
- * Storage module — dual-mode persistence.
+ * Storage module — DB-first persistence.
  *
- * If Firebase is configured → writes to both Firebase Realtime DB and localStorage.
- *   Firebase listeners keep localStorage in sync with other clients.
+ * If Firebase is configured → Firebase Realtime DB is the source of truth.
+ *   localStorage is used only as a temporary read cache for synchronous UI access.
  * If Firebase is NOT configured → works with localStorage only (offline mode).
- *
- * All reads are synchronous (from localStorage cache).
- * All writes are sync (localStorage) + async (Firebase push in background).
  */
 const Storage = (() => {
   const KEYS = {
@@ -21,6 +18,7 @@ const Storage = (() => {
   let firebaseReady = false;
   let _onResultsChange = null; // callback for real-time leaderboard
   let _onTestsChange = null;
+  let _testsSeededInFirebase = false;
   const _battleListeners = new Map();
 
   function _getBattlesMap() {
@@ -55,6 +53,16 @@ const Storage = (() => {
     return next;
   }
 
+  function _seedDefaultTestsInFirebase() {
+    if (!firebaseReady || _testsSeededInFirebase) return;
+    _testsSeededInFirebase = true;
+    const samples = SampleTests.getAll();
+    if (samples.length === 0) return;
+    const updates = {};
+    samples.forEach(t => { updates['tests/' + t.id] = t; });
+    db.ref().update(updates);
+  }
+
   // ——— Firebase Init ———
   function initFirebase() {
     try {
@@ -85,11 +93,14 @@ const Storage = (() => {
     if (!firebaseReady) return;
     db.ref('tests').on('value', (snapshot) => {
       const data = snapshot.val();
-      if (data) {
-        const tests = Object.values(data);
-        localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
-        if (_onTestsChange) _onTestsChange(tests);
+      const tests = data ? Object.values(data) : [];
+
+      if (!data) {
+        _seedDefaultTestsInFirebase();
       }
+
+      localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
+      if (_onTestsChange) _onTestsChange(tests);
     });
   }
 
@@ -137,29 +148,17 @@ const Storage = (() => {
   // ——— Tests ———
   function getTests() {
     const raw = localStorage.getItem(KEYS.TESTS);
-    if (!raw) {
-      const samples = SampleTests.getAll();
-      localStorage.setItem(KEYS.TESTS, JSON.stringify(samples));
-      if (firebaseReady) {
-        samples.forEach(t => db.ref('tests/' + t.id).set(t));
-      }
-      return samples;
+    if (raw) return JSON.parse(raw);
+
+    if (firebaseReady) {
+      // Firebase is authoritative; return temporary empty cache until listener syncs.
+      return [];
     }
-    // Ensure any new sample tests are added to existing list
-    const existing = JSON.parse(raw);
+
+    // Offline fallback: use bundled sample tests in local cache.
     const samples = SampleTests.getAll();
-    let updated = false;
-    samples.forEach(s => {
-      if (!existing.find(e => e.id === s.id)) {
-        existing.push(s);
-        updated = true;
-        if (firebaseReady) db.ref('tests/' + s.id).set(s);
-      }
-    });
-    if (updated) {
-      localStorage.setItem(KEYS.TESTS, JSON.stringify(existing));
-    }
-    return existing;
+    localStorage.setItem(KEYS.TESTS, JSON.stringify(samples));
+    return samples;
   }
 
   function getTest(id) {
@@ -167,31 +166,28 @@ const Storage = (() => {
   }
 
   function saveTest(test) {
-    // Local
+    // Temporary local cache update for immediate UI feedback.
     const tests = getTests();
     const idx = tests.findIndex(t => t.id === test.id);
-    if (idx >= 0) {
-      tests[idx] = test;
-    } else {
-      tests.push(test);
-    }
+    if (idx >= 0) tests[idx] = test;
+    else tests.push(test);
     localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
 
-    // Firebase
     if (firebaseReady) {
+      // Authoritative write.
       db.ref('tests/' + test.id).set(test);
     }
   }
 
   function deleteTest(id) {
-    // Local
+    // Temporary local cache update.
     const tests = getTests().filter(t => t.id !== id);
     localStorage.setItem(KEYS.TESTS, JSON.stringify(tests));
     const results = getResults().filter(r => r.testId !== id);
     localStorage.setItem(KEYS.RESULTS, JSON.stringify(results));
 
-    // Firebase
     if (firebaseReady) {
+      // Authoritative delete.
       db.ref('tests/' + id).remove();
       // Remove related results
       db.ref('results').orderByChild('testId').equalTo(id).once('value', (snapshot) => {

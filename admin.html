@@ -135,7 +135,7 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
   <script src="js/i18n.js?v=2"></script>
-  <script src="js/storage.js"></script>
+  <script src="js/storage.js?v=3"></script>
   <script src="js/utils.js"></script>
   <script>
     Storage.initFirebase();
@@ -149,8 +149,16 @@
     } catch (e) { console.warn('[TestArena] Firebase Storage unavailable:', e.message); }
 
     (function () {
+      const ADMIN_PASSWORD = 'Ramis509admin!';
+      const ADMIN_AUTH_VERSION = 2;
+
       // Check if already admin
       let user = Storage.getUser();
+
+      if (user && user.role === 'admin' && user.authVersion !== ADMIN_AUTH_VERSION) {
+        Storage.clearUser();
+        user = null;
+      }
 
       if (user && user.role === 'admin') {
         // Already logged in as admin, proceed
@@ -204,10 +212,8 @@
             return;
           }
 
-          const correctPass = localStorage.getItem('ct_admin_password') || 'admin';
-
-          if (pass === correctPass) {
-            user = { name, role: 'admin', group: '' };
+          if (pass === ADMIN_PASSWORD) {
+            user = { name, role: 'admin', group: '', authVersion: ADMIN_AUTH_VERSION };
             Storage.setUser(user);
             initAdmin(user);
           } else {
@@ -702,13 +708,12 @@
 
         // ——— Settings ———
         function renderSettings() {
-          const currentPassword = localStorage.getItem('ct_admin_password') || 'admin';
           document.getElementById('tabContent').innerHTML = `
           <div class="card" style="max-width:500px; margin:0 auto; padding:30px;">
             <h2 style="margin-bottom:25px; color:#333;">${t('system_config')}</h2>
             <div class="form-group">
               <label>${t('admin_password')}</label>
-              <input type="text" id="adminPass" class="form-control" value="${Utils.escapeHtml(currentPassword)}">
+              <input type="password" id="adminPass" class="form-control" placeholder="${t('enter_password')}">
             </div>
             <button onclick="saveSettings()" class="btn btn-primary btn-block" style="margin-top:20px;">${t('save_config')}</button>
 
@@ -724,7 +729,10 @@
         window.saveSettings = function () {
           const pass = document.getElementById('adminPass').value.trim();
           if (!pass) { Utils.showNotification(t('password_required'), 'error'); return; }
-          localStorage.setItem('ct_admin_password', pass);
+          if (pass !== ADMIN_PASSWORD) {
+            Utils.showNotification(t('wrong_password'), 'error');
+            return;
+          }
           Utils.showNotification(t('settings_saved'), 'success');
         };
 
