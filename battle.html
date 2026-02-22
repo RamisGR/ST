@@ -413,6 +413,7 @@
       // State
       let battle = null;
       let myPlayerId = null;
+      let participantToken = null;
       let battleRef = null;
       let currentQuestion = 0;
       let answers = [];
@@ -422,6 +423,21 @@
       let testStartTime = 0;
       let showingIntermediateResults = false;
       let joinLock = false;
+
+      function getStoredParticipantToken(roomCode) {
+        if (localStorage.getItem('battle_room') !== roomCode) return null;
+        return localStorage.getItem('battle_participant_token');
+      }
+
+      function persistParticipantSession(roomCode, joinResult, isCreatorFlag) {
+        participantToken = joinResult.token;
+        myPlayerId = joinResult.playerId;
+        localStorage.setItem('battle_participant_token', joinResult.token);
+        localStorage.setItem('battle_player_id', joinResult.playerId);
+        localStorage.setItem('battle_room', roomCode);
+        localStorage.setItem('battle_is_creator', isCreatorFlag ? 'true' : 'false');
+        localStorage.setItem('battle_is_observer', 'false');
+      }
       let isObserver = false;
       let battleTestStarted = false; // Guard against re-entry
       let battleSettings = null;
@@ -443,7 +459,7 @@
         if (localStorage.getItem('battle_is_observer') === 'true' && localStorage.getItem('battle_room') === roomParam) {
           isObserver = true;
         }
-        showJoinScreen(roomParam);
+        void showJoinScreen(roomParam);
       } else {
         showCreateOrJoin();
       }
@@ -508,10 +524,15 @@
           if (sel) sel.value = testParam;
         }
 
-        document.getElementById('createBtn').addEventListener('click', () => {
+        document.getElementById('createBtn').addEventListener('click', async () => {
+          if (joinLock) return;
+          joinLock = true;
           const testId = document.getElementById('testSelect').value;
           const name = user ? user.name : document.getElementById('creatorName').value.trim();
-          if (!name) return alert(t('name_required'));
+          if (!name) {
+            joinLock = false;
+            return alert(t('name_required'));
+          }
 
           if (!user) Storage.setUser({ name, role: 'student' });
 
@@ -526,59 +547,71 @@
             // Observer mode — don't join as player
             isObserver = true;
             myPlayerId = null;
+            participantToken = null;
             localStorage.removeItem('battle_player_id');
+            localStorage.removeItem('battle_participant_token');
             localStorage.setItem('battle_is_observer', 'true');
           } else {
-            // Join as player
             isObserver = false;
-            myPlayerId = Storage.joinBattle(b.id, name, user ? (user.group || '') : '');
-            localStorage.setItem('battle_player_id', myPlayerId);
-            localStorage.setItem('battle_is_observer', 'false');
+            const joinResult = await Storage.joinBattleWithToken(b.id, name, user ? (user.group || '') : '', null);
+            if (!joinResult.ok) {
+              joinLock = false;
+              return alert(t('error_occurred') + ': ' + joinResult.error);
+            }
+            persistParticipantSession(b.id, joinResult, true);
           }
 
           localStorage.setItem('battle_room', b.id);
           localStorage.setItem('battle_is_creator', 'true');
 
           history.replaceState(null, '', 'battle.html?room=' + b.id);
+          joinLock = false;
           showLobby(b.id);
         });
 
-        document.getElementById('joinBtn').addEventListener('click', () => {
+        document.getElementById('joinBtn').addEventListener('click', async () => {
           const code = document.getElementById('roomCode').value.trim().toUpperCase();
           const name = user ? user.name : document.getElementById('joinName').value.trim();
           if (!code || !name) return alert(t('pin_name_required'));
 
           if (!user) Storage.setUser({ name, role: 'student' });
-          showJoinScreen(code);
+          await showJoinScreen(code);
         });
       }
 
-      function showJoinScreen(roomCode) {
+      async function showJoinScreen(roomCode) {
+        if (joinLock) return;
+        joinLock = true;
+
         // Observer returning
         if (isObserver) {
-          showLobby(roomCode);
-          return;
-        }
-
-        const savedRoom = localStorage.getItem('battle_room');
-        const savedPlayerId = localStorage.getItem('battle_player_id');
-
-        if (savedRoom === roomCode && savedPlayerId) {
-          myPlayerId = savedPlayerId;
+          joinLock = false;
           showLobby(roomCode);
           return;
         }
 
         const name = user ? user.name : prompt(t('enter_nickname'));
-        if (!name) return;
+        if (!name) {
+          joinLock = false;
+          return;
+        }
 
         if (!user) Storage.setUser({ name, role: 'student' });
 
-        myPlayerId = Storage.joinBattle(roomCode, name, user ? user.group : '');
-        localStorage.setItem('battle_player_id', myPlayerId);
-        localStorage.setItem('battle_room', roomCode);
-        localStorage.setItem('battle_is_creator', 'false');
-        localStorage.setItem('battle_is_observer', 'false');
+        const storedToken = getStoredParticipantToken(roomCode);
+        const joinResult = await Storage.joinBattleWithToken(roomCode, name, user ? user.group : '', storedToken);
+        if (!joinResult.ok) {
+          joinLock = false;
+          if (joinResult.error === 'NAME_TAKEN') {
+            alert('Это имя уже занято в комнате. Выберите другое имя или войдите с прежнего устройства для продолжения.');
+          } else {
+            alert(t('error_occurred') + ': ' + joinResult.error);
+          }
+          return;
+        }
+
+        persistParticipantSession(roomCode, joinResult, false);
+        joinLock = false;
         showLobby(roomCode);
       }
 
