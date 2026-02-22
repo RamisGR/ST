@@ -53,6 +53,93 @@ const Storage = (() => {
     return next;
   }
 
+  function _toAnswerEvent(raw, questionIndex) {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === 'number') {
+      return {
+        questionIndex,
+        answerIndex: raw,
+        clientSentAt: null,
+        serverReceivedAt: null,
+      };
+    }
+    if (typeof raw !== 'object') return null;
+    return {
+      questionIndex: raw.questionIndex ?? questionIndex,
+      answerIndex: raw.answerIndex,
+      clientSentAt: raw.clientSentAt || null,
+      serverReceivedAt: raw.serverReceivedAt || null,
+    };
+  }
+
+  function _computeBattleScoreboardEntry(room, playerId) {
+    if (!room || !room.players || !room.players[playerId]) return null;
+    const player = room.players[playerId];
+    const test = getTest(room.testId);
+    const questions = (test && test.questions) || [];
+    const answersMap = player.answers || {};
+    const answerEvents = Object.keys(answersMap)
+      .map((k) => _toAnswerEvent(answersMap[k], Number(k)))
+      .filter(e => e && Number.isInteger(e.questionIndex) && Number.isInteger(e.answerIndex) && e.answerIndex >= 0);
+
+    const latestByQuestion = new Map();
+    answerEvents.forEach((e) => {
+      const prev = latestByQuestion.get(e.questionIndex);
+      const eTs = e.serverReceivedAt || 0;
+      const pTs = prev ? (prev.serverReceivedAt || 0) : -1;
+      if (!prev || eTs >= pTs) latestByQuestion.set(e.questionIndex, e);
+    });
+
+    let computedScore = 0;
+    latestByQuestion.forEach((e, qIndex) => {
+      if (questions[qIndex] && questions[qIndex].correct === e.answerIndex) computedScore++;
+    });
+
+    const timestamps = Array.from(latestByQuestion.values())
+      .map(e => e.serverReceivedAt)
+      .filter(ts => typeof ts === 'number' && ts > 0)
+      .sort((a, b) => a - b);
+
+    const startedAt = room.startedAt || player.joinedAt || null;
+    const finishedAnswers = latestByQuestion.size;
+    const computedFinished = questions.length > 0 && finishedAnswers >= questions.length;
+    const endTs = timestamps.length > 0 ? timestamps[timestamps.length - 1] : null;
+    const computedTimeSpent = (computedFinished && startedAt && endTs)
+      ? Math.max(0, Math.round((endTs - startedAt) / 1000))
+      : 0;
+
+    return {
+      playerId,
+      name: player.name || '',
+      group: player.group || '',
+      answeredCount: finishedAnswers,
+      computedScore,
+      computedTimeSpent,
+      computedFinished,
+      computedFinishedAt: computedFinished ? endTs : null,
+      updatedAt: Date.now(),
+    };
+  }
+
+  function recomputeBattleScoreboard(roomCode, playerId) {
+    if (firebaseReady) {
+      return db.ref('battles/' + roomCode).once('value').then((snapshot) => {
+        const room = snapshot.val();
+        const entry = _computeBattleScoreboardEntry(room, playerId);
+        if (!entry) return null;
+        return db.ref('battles/' + roomCode + '/scoreboard/' + playerId).set(entry).then(() => entry);
+      });
+    }
+
+    const room = _getBattle(roomCode);
+    const entry = _computeBattleScoreboardEntry(room, playerId);
+    if (!entry) return null;
+    const scoreboard = { ...((room && room.scoreboard) || {}) };
+    scoreboard[playerId] = entry;
+    _patchBattle(roomCode, { scoreboard });
+    return entry;
+  }
+
   function _seedDefaultTestsInFirebase() {
     if (!firebaseReady || _testsSeededInFirebase) return;
     _testsSeededInFirebase = true;
@@ -342,6 +429,7 @@ const Storage = (() => {
       currentQuestion: 0,
       creatorPlayerId: null,
       players: {},
+      scoreboard: {},
       battleSettings,
     };
     if (firebaseReady) {
@@ -359,20 +447,39 @@ const Storage = (() => {
       group: playerGroup,
       joinedAt: Date.now(),
       currentQuestion: 0,
-      correctCount: 0,
       answeredCount: 0,
       answers: {},
-      finished: false,
-      finishedAt: null,
-      timeSpent: 0,
     };
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
+      db.ref('battles/' + roomCode + '/scoreboard/' + playerId).set({
+        playerId,
+        name: playerName,
+        group: playerGroup,
+        answeredCount: 0,
+        computedScore: 0,
+        computedTimeSpent: 0,
+        computedFinished: false,
+        computedFinishedAt: null,
+        updatedAt: Date.now(),
+      });
     }
     const room = _getBattle(roomCode);
     if (room) {
       room.players = room.players || {};
       room.players[playerId] = player;
+      room.scoreboard = room.scoreboard || {};
+      room.scoreboard[playerId] = {
+        playerId,
+        name: playerName,
+        group: playerGroup,
+        answeredCount: 0,
+        computedScore: 0,
+        computedTimeSpent: 0,
+        computedFinished: false,
+        computedFinishedAt: null,
+        updatedAt: Date.now(),
+      };
       _setBattle(roomCode, room);
     }
     return playerId;
@@ -389,16 +496,32 @@ const Storage = (() => {
     }
   }
 
-  function saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex) {
+  function saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex, clientSentAt = Date.now()) {
+    const payload = {
+      questionIndex,
+      answerIndex,
+      clientSentAt,
+      serverReceivedAt: Date.now(),
+    };
     if (firebaseReady) {
-      db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex).set(answerIndex);
+      const answerRef = db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex);
+      answerRef.transaction((current) => {
+        if (current && typeof current === 'object' && current.serverReceivedAt) return current;
+        return {
+          questionIndex,
+          answerIndex,
+          clientSentAt: payload.clientSentAt,
+          serverReceivedAt: firebase.database.ServerValue.TIMESTAMP,
+        };
+      });
     }
     const room = _getBattle(roomCode);
     if (room && room.players && room.players[playerId]) {
       const answers = { ...(room.players[playerId].answers || {}) };
-      answers[questionIndex] = answerIndex;
+      answers[questionIndex] = payload;
       room.players[playerId] = { ...room.players[playerId], answers };
       _setBattle(roomCode, room);
+      recomputeBattleScoreboard(roomCode, playerId);
     }
   }
 
