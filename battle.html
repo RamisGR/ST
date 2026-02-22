@@ -521,7 +521,7 @@
           if (sel) sel.value = testParam;
         }
 
-        document.getElementById('createBtn').addEventListener('click', () => {
+        document.getElementById('createBtn').addEventListener('click', async () => {
           const testId = document.getElementById('testSelect').value;
           const name = user ? user.name : document.getElementById('creatorName').value.trim();
           if (!name) return alert(t('name_required'));
@@ -547,12 +547,21 @@
           } else {
             // Join as player
             isObserver = false;
-            myPlayerId = Storage.joinBattle(b.id, name, user ? (user.group || '') : '');
-            hostActorId = myPlayerId;
-            Storage.setBattleHost(b.id, hostActorId);
-            localStorage.setItem('battle_host_actor_id', hostActorId);
-            localStorage.setItem('battle_player_id', myPlayerId);
-            localStorage.setItem('battle_is_observer', 'false');
+            try {
+              myPlayerId = await Storage.joinBattle(b.id, name, user ? (user.group || '') : '');
+              localStorage.setItem('battle_player_id', myPlayerId);
+              localStorage.setItem('battle_is_observer', 'false');
+            } catch (e) {
+              if (e && e.code === 'BATTLE_NOT_WAITING') {
+                alert('Игра уже началась, подключение закрыто');
+                isObserver = true;
+                myPlayerId = null;
+                localStorage.removeItem('battle_player_id');
+                localStorage.setItem('battle_is_observer', 'true');
+              } else {
+                throw e;
+              }
+            }
           }
 
           localStorage.setItem('battle_room', b.id);
@@ -572,7 +581,7 @@
         });
       }
 
-      function showJoinScreen(roomCode) {
+      async function showJoinScreen(roomCode) {
         // Observer returning
         if (isObserver) {
           showLobby(roomCode);
@@ -593,14 +602,28 @@
 
         if (!user) Storage.setUser({ name, role: 'student' });
 
-        myPlayerId = Storage.joinBattle(roomCode, name, user ? user.group : '');
-        localStorage.setItem('battle_player_id', myPlayerId);
-        localStorage.setItem('battle_room', roomCode);
-        localStorage.setItem('battle_is_creator', 'false');
-        localStorage.setItem('battle_is_observer', 'false');
-        localStorage.removeItem('battle_host_actor_id');
-        hostActorId = null;
-        showLobby(roomCode);
+        try {
+          myPlayerId = await Storage.joinBattle(roomCode, name, user ? user.group : '');
+          localStorage.setItem('battle_player_id', myPlayerId);
+          localStorage.setItem('battle_room', roomCode);
+          localStorage.setItem('battle_is_creator', 'false');
+          localStorage.setItem('battle_is_observer', 'false');
+          isObserver = false;
+          showLobby(roomCode);
+        } catch (e) {
+          if (e && e.code === 'BATTLE_NOT_WAITING') {
+            alert('Игра уже началась, подключение закрыто');
+            isObserver = true;
+            myPlayerId = null;
+            localStorage.removeItem('battle_player_id');
+            localStorage.setItem('battle_room', roomCode);
+            localStorage.setItem('battle_is_creator', 'false');
+            localStorage.setItem('battle_is_observer', 'true');
+            showLobby(roomCode);
+            return;
+          }
+          throw e;
+        }
       }
 
       function showLobby(roomCode) {
@@ -1212,6 +1235,7 @@
       }
 
       window.selectAnswer = function (index) {
+        if (isObserver || !myPlayerId) return;
         if (answers[currentQuestion] !== -1) return;
         answers[currentQuestion] = index;
         // Visual feedback via DOM, no re-render

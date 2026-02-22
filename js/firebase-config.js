@@ -41,35 +41,22 @@ const FirebaseConfig = {
  *     "sessions": {
  *       ".read": true,
  *       ".write": true
- *     }
- *   }
- * }
- *
-
- * Рекомендуемые правила для battlе-режима (чтобы игроки не меняли фазу комнаты):
- *
- * "battles": {
- *   "$room": {
- *     ".read": true,
- *     "phase": {
- *       ".write": "data.parent().child('creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val() && root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
  *     },
- *     "questionIndex": {
- *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
- *     },
- *     "phaseStartedAt": {
- *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
- *     },
- *     "phaseDurationMs": {
- *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
- *     },
- *     "players": {
- *       "$playerId": {
- *         ".write": true
+ *     "battles": {
+ *       ".read": true,
+ *       "$room": {
+ *         "players": {
+ *           "$playerId": {
+ *             ".write": "root.child('battles').child($room).child('status').val() === 'waiting'"
+ *           }
+ *         }
  *       }
  *     }
  *   }
  * }
+ *
+ * Актуальный JSON правил также сохранён в `firebase-rtdb-rules.json`.
+ *
  * Для тестового режима (открытый доступ на 30 дней):
  * {
  *   "rules": {
