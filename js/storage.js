@@ -346,7 +346,22 @@ const Storage = (() => {
     return battle;
   }
 
-  function joinBattle(roomCode, playerName, playerGroup) {
+  async function joinBattle(roomCode, playerName, playerGroup) {
+    let status = 'waiting';
+    if (firebaseReady) {
+      const snapshot = await db.ref('battles/' + roomCode + '/status').once('value');
+      status = snapshot.val() || 'waiting';
+    } else {
+      const room = _getBattle(roomCode);
+      status = room && room.status ? room.status : 'waiting';
+    }
+
+    if (status !== 'waiting') {
+      const err = new Error('Battle is no longer accepting players');
+      err.code = 'BATTLE_NOT_WAITING';
+      throw err;
+    }
+
     const playerId = generateId();
     const player = {
       id: playerId,
@@ -362,7 +377,7 @@ const Storage = (() => {
       timeSpent: 0,
     };
     if (firebaseReady) {
-      db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
+      await db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
     }
     const room = _getBattle(roomCode);
     if (room) {

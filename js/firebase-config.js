@@ -41,9 +41,21 @@ const FirebaseConfig = {
  *     "sessions": {
  *       ".read": true,
  *       ".write": true
+ *     },
+ *     "battles": {
+ *       ".read": true,
+ *       "$room": {
+ *         "players": {
+ *           "$playerId": {
+ *             ".write": "root.child('battles').child($room).child('status').val() === 'waiting'"
+ *           }
+ *         }
+ *       }
  *     }
  *   }
  * }
+ *
+ * Актуальный JSON правил также сохранён в `firebase-rtdb-rules.json`.
  *
  * Для тестового режима (открытый доступ на 30 дней):
  * {
