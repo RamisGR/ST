@@ -438,6 +438,16 @@
         { color: 'var(--green)', shape: 'shape-square', shadow: 'var(--green-shadow)' }
       ];
 
+      function getScoreboardPlayers(data) {
+        if (!data || !data.scoreboard) return [];
+        return Object.values(data.scoreboard)
+          .sort((a, b) => {
+            const scoreDiff = (b.computedScore || 0) - (a.computedScore || 0);
+            if (scoreDiff !== 0) return scoreDiff;
+            return (a.computedTimeSpent || 0) - (b.computedTimeSpent || 0);
+          });
+      }
+
       if (roomParam) {
         // Check if returning as observer
         if (localStorage.getItem('battle_is_observer') === 'true' && localStorage.getItem('battle_room') === roomParam) {
@@ -812,14 +822,17 @@
       function renderTeacherDashboard(roomCode) {
         if (!battle) return;
         const players = battle.players ? Object.values(battle.players) : [];
+        const scoreboardPlayers = getScoreboardPlayers(battle);
+        const scoreboardById = new Map(scoreboardPlayers.map(p => [p.playerId, p]));
+        const livePlayers = players.map((p) => ({ ...p, ...(scoreboardById.get(p.id) || {}) }));
         testData = testData || Storage.getTest(battle.testId);
         if (!testData) return;
 
         const totalQ = testData.questions.length;
-        const allFinished = players.length > 0 && players.every(p => p.finished);
-        const finishedCount = players.filter(p => p.finished).length;
-        const avgProgress = players.length > 0
-          ? Math.round(players.reduce((sum, p) => sum + (p.answeredCount || 0), 0) / players.length)
+        const allFinished = livePlayers.length > 0 && livePlayers.every(p => p.computedFinished);
+        const finishedCount = livePlayers.filter(p => p.computedFinished).length;
+        const avgProgress = livePlayers.length > 0
+          ? Math.round(livePlayers.reduce((sum, p) => sum + (p.answeredCount || 0), 0) / livePlayers.length)
           : 0;
 
         document.getElementById('app').innerHTML = `
@@ -829,11 +842,11 @@
             <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('players_stat')}</div>
-                <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${livePlayers.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('finished_stat')}</div>
-                <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${players.length}</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${livePlayers.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_progress')}</div>
@@ -858,11 +871,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${players.sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0)).map((p, i) => {
+                  ${livePlayers.sort((a, b) => (b.computedScore || 0) - (a.computedScore || 0)).map((p, i) => {
           const answered = p.answeredCount || 0;
-          const correct = p.correctCount || 0;
+          const correct = p.computedScore || 0;
           const pct = Math.round((answered / totalQ) * 100);
-          const isFinished = p.finished;
+          const isFinished = !!p.computedFinished;
           const barColor = isFinished ? 'var(--green)' : 'var(--blue)';
           const statusColor = isFinished ? '#26890C' : '#D89E00';
           const statusText = isFinished ? t('status_done') : t('status_playing');
@@ -897,7 +910,7 @@
         }).join('')}
                 </tbody>
               </table>
-              ${players.length === 0 ? `<p style="color:#999; padding:30px; text-align:center;">${t('waiting_start')}</p>` : ''}
+              ${livePlayers.length === 0 ? `<p style="color:#999; padding:30px; text-align:center;">${t('waiting_start')}</p>` : ''}
             </div>
 
             ${buildQuestionErrorStatsHtml(players, testData.questions)}
@@ -915,9 +928,9 @@
       }
 
       function showTeacherResults(roomCode) {
-        if (!battle || !battle.players) return;
+        if (!battle) return;
         testData = testData || Storage.getTest(battle.testId);
-        const players = Object.values(battle.players).sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0));
+        const players = getScoreboardPlayers(battle);
         const totalQ = testData ? testData.questions.length : (battle.questionsCount || 0);
 
         document.getElementById('app').innerHTML = `
@@ -932,13 +945,13 @@
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
-                  ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.correctCount || 0), 0) / players.length * 100 / totalQ) : 0}%
+                  ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.computedScore || 0), 0) / players.length * 100 / totalQ) : 0}%
                 </div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('best_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
-                  ${players.length > 0 ? Math.round((players[0].correctCount || 0) / totalQ * 100) : 0}%
+                  ${players.length > 0 ? Math.round((players[0].computedScore || 0) / totalQ * 100) : 0}%
                 </div>
               </div>
             </div>
@@ -957,9 +970,9 @@
                 </thead>
                 <tbody>
                   ${players.map((p, i) => {
-          const correct = p.correctCount || 0;
+          const correct = p.computedScore || 0;
           const scorePct = totalQ > 0 ? Math.round(correct / totalQ * 100) : 0;
-          const timeSpent = p.timeSpent || 0;
+          const timeSpent = p.computedTimeSpent || 0;
           const rankColors = ['#D89E00', '#C0C0C0', '#CD7F32'];
           const rankBg = i < 3 ? rankColors[i] : '#eee';
           const rankColor = i < 3 ? 'white' : '#888';
@@ -1053,10 +1066,9 @@
           if (te) { te.textContent = perQuestionTimeLeft; if (perQuestionTimeLeft <= 5) te.style.background = 'var(--red)'; }
           if (perQuestionTimeLeft <= 0) {
             clearInterval(timerInterval); timerInterval = null;
-            Storage.saveBattleAnswer(roomCode, myPlayerId, currentQuestion, answers[currentQuestion]);
+            Storage.saveBattleAnswer(roomCode, myPlayerId, currentQuestion, answers[currentQuestion], Date.now());
             let cc = 0;
             answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) cc++; });
-            Storage.updateBattlePlayer(roomCode, myPlayerId, { currentQuestion, correctCount: cc, answeredCount: answers.filter(a => a >= 0).length });
             showingIntermediateResults = true;
             renderRatingScreen(roomCode, currentQuestion);
           }
@@ -1110,8 +1122,10 @@
         const totalPlayers = players.length || 1;
         const counts = new Array(q.options.length).fill(0);
         players.forEach(p => {
-          if (p.answers && p.answers[qIndex] !== undefined && p.answers[qIndex] >= 0) {
-            counts[p.answers[qIndex]]++;
+          if (p.answers && p.answers[qIndex] !== undefined) {
+            const raw = p.answers[qIndex];
+            const a = (raw && typeof raw === 'object') ? raw.answerIndex : raw;
+            if (a >= 0) counts[a]++;
           }
         });
         const maxCount = Math.max(...counts, 1);
@@ -1222,15 +1236,11 @@
           if (i === index) { btn.style.transform = 'scale(0.98)'; btn.style.opacity = '1'; }
           else { btn.style.opacity = '0.3'; }
         });
-        let correctCount = 0;
-        answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) correctCount++; });
         const room = localStorage.getItem('battle_room');
         const bs = battleSettings;
         if (bs && bs.perQuestionMode) {
-          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index);
-          Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
+          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index, Date.now());
         } else {
-          Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
           setTimeout(() => {
             if (currentQuestion < testData.questions.length - 1) {
               currentQuestion++;
@@ -1252,19 +1262,6 @@
           if (a >= 0 && a === testData.questions[i].correct) correctCount++;
         });
 
-        const rawTime = Math.round((Date.now() - testStartTime) / 1000);
-        const _bs = battleSettings;
-        const maxTime = (_bs && _bs.perQuestionMode)
-          ? (_bs.perQuestionTime || 20) * testData.questions.length
-          : (testData.timeLimit || Infinity);
-        const timeSpent = Math.min(rawTime, maxTime);
-
-        Storage.updateBattlePlayer(roomCode, myPlayerId, {
-          finished: true,
-          finishedAt: Date.now(),
-          correctCount: correctCount,
-          timeSpent: timeSpent
-        });
 
         // Wait screen
         document.getElementById('app').innerHTML = `
@@ -1282,9 +1279,9 @@
         const isCreator = localStorage.getItem('battle_is_creator') === 'true';
         if (isCreator) {
           const checkAll = setInterval(() => {
-            if (!battle || !battle.players) return;
-            const players = Object.values(battle.players);
-            if (players.every(p => p.finished)) {
+            if (!battle) return;
+            const players = getScoreboardPlayers(battle);
+            if (players.length > 0 && players.every(p => p.computedFinished)) {
               clearInterval(checkAll);
               Storage.finishBattle(roomCode);
             }
@@ -1293,8 +1290,8 @@
       }
 
       function showFinalResults(roomCode) {
-        if (!battle || !battle.players) return;
-        const players = Object.values(battle.players).sort((a, b) => b.correctCount - a.correctCount);
+        if (!battle) return;
+        const players = getScoreboardPlayers(battle);
         const top3 = players.slice(0, 3);
 
         const p1 = top3[0];
@@ -1311,7 +1308,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#C0C0C0; color:white; width:70px; height:70px; font-size:1.8rem;">${p2.name.charAt(0)}</div>
                    <div class="podium-rank-2" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#D8D8D8,#9A9A9A); height:140px;">2</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p2.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.correctCount} ${t('pts')}</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.computedScore || 0} ${t('pts')}</div>
                 </div>
               ` : ''}
 
@@ -1321,7 +1318,7 @@
                  </div>
                  <div class="podium-rank-1" style="width:100%; border-radius:15px 15px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; font-weight:900; font-size:4rem; color:white; box-shadow:0 8px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#FFD700,#C68C00); height:180px;">1</div>
                  <div style="background:white; color:#333; width:100%; padding:15px 5px; font-weight:900; border-radius:0 0 8px 8px; font-size:1.4rem; margin-top:4px;">${Utils.escapeHtml(p1.name)}</div>
-                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.correctCount} ${t('pts')}</div>
+                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.computedScore || 0} ${t('pts')}</div>
               </div>
 
               ${p3 ? `
@@ -1329,7 +1326,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#CD7F32; color:white; width:70px; height:70px; font-size:1.8rem;">${p3.name.charAt(0)}</div>
                    <div class="podium-rank-3" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#E0A060,#B06828); height:110px;">3</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p3.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.correctCount} ${t('pts')}</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.computedScore || 0} ${t('pts')}</div>
                 </div>
               ` : ''}
             </div>
@@ -1347,8 +1344,8 @@
                       <td style="padding:10px 8px; width:36px; font-size:${i < 3 ? '1.25rem' : '1rem'}; text-align:center;">${rankLabel}</td>
                       <td style="padding:10px 8px; color:white; font-weight:800; font-size:1rem;">${Utils.escapeHtml(p.name)}</td>
                       <td style="padding:10px 8px; color:rgba(255,255,255,0.5); font-size:0.85rem;">${Utils.escapeHtml(p.group || '')}</td>
-                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.correctCount} ${t('pts')}</td>
-                      <td style="padding:10px 8px; color:rgba(255,255,255,0.5); text-align:right; font-size:0.85rem;">${Utils.formatTime(p.timeSpent || 0)}</td>
+                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.computedScore || 0} ${t('pts')}</td>
+                      <td style="padding:10px 8px; color:rgba(255,255,255,0.5); text-align:right; font-size:0.85rem;">${Utils.formatTime(p.computedTimeSpent || 0)}</td>
                     </tr>`;
                   }).join('')}
                 </tbody>
