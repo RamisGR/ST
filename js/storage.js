@@ -420,9 +420,14 @@ const Storage = (() => {
       timeLimit,
       createdBy: creatorName,
       createdAt: Date.now(),
-      status: 'waiting', // waiting | countdown | active | showing_rating | finished
+      status: 'waiting', // legacy
+      phase: 'waiting', // waiting | countdown | question | rating | finished
+      questionIndex: 0,
+      phaseStartedAt: null,
+      phaseDurationMs: 0,
       startedAt: null,
       currentQuestion: 0,
+      creatorPlayerId: null,
       players: {},
       scoreboard: {},
       battleSettings,
@@ -527,33 +532,78 @@ const Storage = (() => {
     _patchBattle(roomCode, data);
   }
 
-  function startBattle(roomCode) {
-    _patchBattle(roomCode, {
-      status: 'countdown',
-      startedAt: Date.now(),
-    });
-
+  function setBattleHost(roomCode, playerId) {
+    if (!playerId) return;
+    const patch = { creatorPlayerId: playerId };
     if (firebaseReady) {
-      db.ref('battles/' + roomCode).update({
-        status: 'countdown',
-        startedAt: Date.now(),
-      });
+      db.ref('battles/' + roomCode).update(patch);
     }
+    _patchBattle(roomCode, patch);
+  }
 
-    // After 4 seconds, set status to active (3-2-1-GO)
-    setTimeout(() => {
-      _patchBattle(roomCode, { status: 'active' });
-      if (firebaseReady) {
-        db.ref('battles/' + roomCode + '/status').set('active');
-      }
-    }, 4000);
+  function startBattle(roomCode, actorPlayerId) {
+    return advanceBattlePhase(roomCode, actorPlayerId, true);
   }
 
   function finishBattle(roomCode) {
-    _patchBattle(roomCode, { status: 'finished' });
+    _patchBattle(roomCode, { status: 'finished', phase: 'finished' });
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/status').set('finished');
     }
+  }
+
+  function _computeNextPhaseState(room, forceStart) {
+    const now = Date.now();
+    const bs = room.battleSettings || {};
+    const questionDurationMs = (bs.perQuestionTime || 20) * 1000;
+    const ratingDurationMs = (bs.ratingDuration || 4) * 1000;
+    const questionsCount = room.questionsCount || 0;
+    const phase = room.phase || room.status || 'waiting';
+    const qIndex = Number(room.questionIndex || room.currentQuestion || 0);
+
+    if (forceStart && phase === 'waiting') {
+      return { phase: 'countdown', status: 'countdown', questionIndex: 0, currentQuestion: 0, phaseStartedAt: now, phaseDurationMs: 4000, startedAt: room.startedAt || now };
+    }
+    if (phase === 'countdown') {
+      return { phase: 'question', status: 'active', questionIndex: 0, currentQuestion: 0, phaseStartedAt: now, phaseDurationMs: questionDurationMs, startedAt: room.startedAt || now };
+    }
+    if (phase === 'question') {
+      return { phase: 'rating', status: 'showing_rating', questionIndex: qIndex, currentQuestion: qIndex, phaseStartedAt: now, phaseDurationMs: ratingDurationMs };
+    }
+    if (phase === 'rating') {
+      if (qIndex < questionsCount - 1) {
+        const nextQ = qIndex + 1;
+        return { phase: 'question', status: 'active', questionIndex: nextQ, currentQuestion: nextQ, phaseStartedAt: now, phaseDurationMs: questionDurationMs };
+      }
+      return { phase: 'finished', status: 'finished', phaseStartedAt: now, phaseDurationMs: 0 };
+    }
+    return null;
+  }
+
+  function advanceBattlePhase(roomCode, actorPlayerId, forceStart = false) {
+    if (!firebaseReady) {
+      const room = _getBattle(roomCode);
+      if (!room) return Promise.resolve(false);
+      if (!forceStart && room.phase && room.phaseStartedAt && room.phaseDurationMs > 0 && (room.phaseStartedAt + room.phaseDurationMs) > Date.now()) return Promise.resolve(false);
+      if (room.creatorPlayerId && room.creatorPlayerId !== actorPlayerId) return Promise.resolve(false);
+      const next = _computeNextPhaseState(room, forceStart);
+      if (!next) return Promise.resolve(false);
+      _patchBattle(roomCode, next);
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      db.ref('battles/' + roomCode).transaction((room) => {
+        if (!room) return room;
+        if (room.creatorPlayerId && room.creatorPlayerId !== actorPlayerId) return;
+        if (!forceStart && room.phaseStartedAt && room.phaseDurationMs > 0 && (room.phaseStartedAt + room.phaseDurationMs) > Date.now()) return;
+        const next = _computeNextPhaseState(room, forceStart);
+        if (!next) return;
+        return { ...room, ...next };
+      }, (error, committed) => {
+        resolve(!error && committed);
+      });
+    });
   }
 
   function onBattleChange(roomCode, callback) {
@@ -620,6 +670,7 @@ const Storage = (() => {
     createBattle, joinBattle, updateBattlePlayer,
     saveBattleAnswer, updateBattleState,
     startBattle, finishBattle,
+    setBattleHost, advanceBattlePhase,
     onBattleChange, offBattleChange, getBattleOnce, getBattleRef,
     generateRoomCode,
   };

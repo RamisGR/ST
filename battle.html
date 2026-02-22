@@ -413,11 +413,13 @@
       // State
       let battle = null;
       let myPlayerId = null;
+      let hostActorId = localStorage.getItem('battle_host_actor_id') || null;
       let battleRef = null;
       let currentQuestion = 0;
       let answers = [];
       let testData = null;
       let timerInterval = null;
+      let phaseTickerInterval = null;
       let timeLeft = 0;
       let testStartTime = 0;
       let showingIntermediateResults = false;
@@ -427,6 +429,7 @@
       let battleSettings = null;
       let perQuestionTimeLeft = 0;
       let ratingTimeLeft = 0;
+      let phaseAdvanceInFlight = false;
       let currentRenderedQuestion = -1; // Track to avoid re-render
       let _dashboardAnimFrame = null;  // rAF handle for throttled dashboard renders
 
@@ -537,11 +540,17 @@
             isObserver = true;
             myPlayerId = null;
             localStorage.removeItem('battle_player_id');
+            hostActorId = 'host_' + Date.now().toString(36);
+            localStorage.setItem('battle_host_actor_id', hostActorId);
+            Storage.setBattleHost(b.id, hostActorId);
             localStorage.setItem('battle_is_observer', 'true');
           } else {
             // Join as player
             isObserver = false;
             myPlayerId = Storage.joinBattle(b.id, name, user ? (user.group || '') : '');
+            hostActorId = myPlayerId;
+            Storage.setBattleHost(b.id, hostActorId);
+            localStorage.setItem('battle_host_actor_id', hostActorId);
             localStorage.setItem('battle_player_id', myPlayerId);
             localStorage.setItem('battle_is_observer', 'false');
           }
@@ -589,6 +598,8 @@
         localStorage.setItem('battle_room', roomCode);
         localStorage.setItem('battle_is_creator', 'false');
         localStorage.setItem('battle_is_observer', 'false');
+        localStorage.removeItem('battle_host_actor_id');
+        hostActorId = null;
         showLobby(roomCode);
       }
 
@@ -601,49 +612,39 @@
           battle = data;
           battleSettings = data.battleSettings || null;
 
-          if (data.status === 'countdown' && !showingIntermediateResults) {
+          const phase = data.phase || (data.status === 'active' ? 'question' : data.status === 'showing_rating' ? 'rating' : data.status || 'waiting');
+          currentQuestion = Number(data.questionIndex || data.currentQuestion || 0);
+
+          if (phase === 'waiting') {
+            stopPhaseTicker();
+            renderLobby(roomCode, data, isCreator);
+            return;
+          }
+          if (phase === 'countdown') {
+            if (isObserver) showTeacherCountdown(roomCode);
+            else showCountdown(roomCode);
+            startPhaseTicker(roomCode);
+            return;
+          }
+          if (phase === 'question') {
             if (isObserver) {
-              showTeacherCountdown(roomCode);
+              scheduleDashboardRender(roomCode);
             } else {
-              showCountdown(roomCode);
+              startBattleTest(roomCode);
             }
+            startPhaseTicker(roomCode);
             return;
           }
-          if (data.status === 'active') {
-            if (!showingIntermediateResults) {
-              if (isObserver) {
-                scheduleDashboardRender(roomCode);
-              } else if (!battleTestStarted) {
-                startBattleTest(roomCode);
-              } else {
-                // Only update timer display, not full re-render
-                const timerEl = document.querySelector('.timer-circle');
-                if (timerEl) {
-                  const bs = battleSettings;
-                  if (bs && bs.perQuestionMode) {
-                    timerEl.textContent = perQuestionTimeLeft;
-                  } else {
-                    timerEl.textContent = timeLeft;
-                  }
-                }
-              }
-            }
-            // ALWAYS return for 'active' status — never fall through to renderLobby
+          if (phase === 'rating') {
+            if (isObserver) renderTeacherRating(roomCode);
+            else renderRatingScreen(roomCode, currentQuestion);
+            startPhaseTicker(roomCode);
             return;
           }
-          if (data.status === 'showing_rating') {
-            if (isObserver) {
-              renderTeacherRating(roomCode);
-            }
-            // Students see their own rating via local control
-            return;
-          }
-          if (data.status === 'finished') {
-            if (isObserver) {
-              showTeacherResults(roomCode);
-            } else {
-              showFinalResults(roomCode);
-            }
+          if (phase === 'finished') {
+            stopPhaseTicker();
+            if (isObserver) showTeacherResults(roomCode);
+            else showFinalResults(roomCode);
             return;
           }
 
@@ -724,14 +725,14 @@
         });
 
         if (isCreator) {
-          document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode));
+          document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode, hostActorId || myPlayerId));
         }
       }
 
       // ——— TEACHER OBSERVER VIEWS ———
 
       function showTeacherCountdown(roomCode) {
-        let count = 3;
+        let count = Math.max(0, Math.ceil(getPhaseMsLeft() / 1000));
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -1009,7 +1010,7 @@
       // ——— STUDENT VIEWS (unchanged) ———
 
       function showCountdown(roomCode) {
-        let count = 3;
+        let count = Math.max(0, Math.ceil(getPhaseMsLeft() / 1000));
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -1032,56 +1033,57 @@
         }, 1000);
       }
 
-      function startBattleTest(roomCode) {
-        if (battleTestStarted) return;
-        battleTestStarted = true;
-        testData = Storage.getTest(battle.testId);
-        if (!testData) return;
-        const bs = battleSettings;
-        answers = new Array(testData.questions.length).fill(-1);
-        currentQuestion = 0;
-        currentRenderedQuestion = -1;
-        testStartTime = Date.now();
-        if (bs && bs.perQuestionMode) {
-          perQuestionTimeLeft = bs.perQuestionTime || 20;
-          renderBattleQuestion(roomCode);
-          startPerQuestionTimer(roomCode);
-        } else {
-          timeLeft = testData.timeLimit;
-          renderBattleQuestion(roomCode);
-          timerInterval = setInterval(() => {
-            timeLeft--;
-            const te = document.querySelector('.timer-circle');
-            if (te) { te.textContent = timeLeft; if (timeLeft <= 10) te.style.background = 'var(--red)'; }
-            if (timeLeft <= 0) finishBattleTest(roomCode);
-          }, 1000);
-        }
+      function getPhaseMsLeft() {
+        if (!battle || !battle.phaseStartedAt) return 0;
+        const total = Number(battle.phaseDurationMs || 0);
+        if (total <= 0) return 0;
+        return Math.max(0, (battle.phaseStartedAt + total) - Date.now());
       }
 
-      function startPerQuestionTimer(roomCode) {
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          perQuestionTimeLeft--;
-          const te = document.querySelector('.timer-circle');
-          if (te) { te.textContent = perQuestionTimeLeft; if (perQuestionTimeLeft <= 5) te.style.background = 'var(--red)'; }
-          if (perQuestionTimeLeft <= 0) {
-            clearInterval(timerInterval); timerInterval = null;
-            Storage.saveBattleAnswer(roomCode, myPlayerId, currentQuestion, answers[currentQuestion], Date.now());
-            let cc = 0;
-            answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) cc++; });
-            showingIntermediateResults = true;
-            renderRatingScreen(roomCode, currentQuestion);
+      function stopPhaseTicker() {
+        if (phaseTickerInterval) clearInterval(phaseTickerInterval);
+        phaseTickerInterval = null;
+        phaseAdvanceInFlight = false;
+      }
+
+      function startPhaseTicker(roomCode) {
+        const isCreator = localStorage.getItem('battle_is_creator') === 'true';
+        if (phaseTickerInterval) return;
+        phaseTickerInterval = setInterval(() => {
+          if (!battle) return;
+          const secLeft = Math.ceil(getPhaseMsLeft() / 1000);
+          const timerEl = document.querySelector('.timer-circle');
+          if (timerEl) {
+            timerEl.textContent = secLeft;
+            if (secLeft <= 5) timerEl.style.background = 'var(--red)';
           }
-        }, 1000);
+          const fill = document.getElementById('ratingTimerFill');
+          if (fill && battle.phaseDurationMs > 0) {
+            fill.style.width = `${Math.max(0, Math.min(100, (getPhaseMsLeft() / battle.phaseDurationMs) * 100))}%`;
+          }
+          if (getPhaseMsLeft() <= 0 && !phaseAdvanceInFlight && isCreator && (hostActorId || myPlayerId)) {
+            phaseAdvanceInFlight = true;
+            Storage.advanceBattlePhase(roomCode, hostActorId || myPlayerId).finally(() => { phaseAdvanceInFlight = false; });
+          }
+        }, 250);
+      }
+
+      function startBattleTest(roomCode) {
+        testData = Storage.getTest(battle.testId);
+        if (!testData) return;
+        if (!battleTestStarted) {
+          battleTestStarted = true;
+          if (!answers.length) answers = new Array(testData.questions.length).fill(-1);
+          testStartTime = testStartTime || Date.now();
+        }
+        currentQuestion = Number(battle.questionIndex || 0);
+        renderBattleQuestion(roomCode);
       }
 
       function renderBattleQuestion(roomCode) {
-        if (showingIntermediateResults) return;
-        if (currentRenderedQuestion === currentQuestion) return;
-        currentRenderedQuestion = currentQuestion;
         const q = testData.questions[currentQuestion];
-        const bs = battleSettings;
-        const displayTime = (bs && bs.perQuestionMode) ? perQuestionTimeLeft : timeLeft;
+        if (!q) return;
+        const displayTime = Math.ceil(getPhaseMsLeft() / 1000);
 
         document.getElementById('app').innerHTML = `
           <div class="container center-content" style="max-width:1000px; padding-top:20px; width:100%;">
@@ -1153,16 +1155,16 @@
 
       function renderRatingScreen(roomCode, qIndex) {
         const q = testData.questions[qIndex];
+        if (!q) return;
         const bs = battleSettings || {};
-        const ratingDuration = bs.ratingDuration || 4;
-        const ratingTitle = bs.ratingTitle || '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432';
+        const ratingTitle = bs.ratingTitle || 'Распределение ответов';
         const players = battle && battle.players ? Object.values(battle.players) : [];
         const chartHtml = buildChartHtml(q, qIndex, bs, players);
 
         document.getElementById('app').innerHTML = `
           <div class="container center-content fade-in" style="max-width:950px;padding-top:20px;text-align:center;">
             <div style="background:rgba(0,0,0,0.3);color:white;padding:10px 25px;border-radius:30px;font-weight:900;font-family:var(--font-display);font-size:1rem;margin-bottom:15px;">
-              \u0412\u043e\u043f\u0440\u043e\u0441 ${qIndex + 1} / ${testData.questions.length}
+              Вопрос ${qIndex + 1} / ${testData.questions.length}
             </div>
             <div class="rating-screen">
               <h3 style="margin:0 0 5px;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">${Utils.escapeHtml(ratingTitle)}</h3>
@@ -1177,32 +1179,13 @@
             document.querySelectorAll('[data-target-width]').forEach(el => { el.style.width = el.dataset.targetWidth; });
           }, 50);
         });
-        ratingTimeLeft = ratingDuration;
-        const ratingIv = setInterval(() => {
-          ratingTimeLeft--;
-          const fill = document.getElementById('ratingTimerFill');
-          if (fill) fill.style.width = `${(ratingTimeLeft / ratingDuration) * 100}%`;
-          if (ratingTimeLeft <= 0) {
-            clearInterval(ratingIv);
-            showingIntermediateResults = false;
-            if (currentQuestion < testData.questions.length - 1) {
-              currentQuestion++;
-              currentRenderedQuestion = -1;
-              perQuestionTimeLeft = (battleSettings && battleSettings.perQuestionTime) || 20;
-              renderBattleQuestion(roomCode);
-              startPerQuestionTimer(roomCode);
-            } else {
-              finishBattleTest(roomCode);
-            }
-          }
-        }, 1000);
       }
 
       function renderTeacherRating(roomCode) {
         if (!battle) return;
         testData = testData || Storage.getTest(battle.testId);
         if (!testData) return;
-        const qIndex = battle.currentQuestion || 0;
+        const qIndex = battle.questionIndex || battle.currentQuestion || 0;
         const q = testData.questions[qIndex];
         if (!q) return;
         const bs = battle.battleSettings || {};
@@ -1237,20 +1220,8 @@
           else { btn.style.opacity = '0.3'; }
         });
         const room = localStorage.getItem('battle_room');
-        const bs = battleSettings;
-        if (bs && bs.perQuestionMode) {
-          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index, Date.now());
-        } else {
-          setTimeout(() => {
-            if (currentQuestion < testData.questions.length - 1) {
-              currentQuestion++;
-              currentRenderedQuestion = -1;
-              renderBattleQuestion(room);
-            } else {
-              finishBattleTest(room);
-            }
-          }, 500);
-        }
+        Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index);
+        Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
       };
 
       function finishBattleTest(roomCode) {
