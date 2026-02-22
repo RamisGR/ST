@@ -25,31 +25,16 @@ const FirebaseConfig = {
 };
 
 /**
- * Правила безопасности для Realtime Database (вставить в консоли Firebase):
+ * Базовая защита доступа:
+ * 1) Включите Firebase Auth и выдавайте Custom Token с claims:
+ *    - role: host | teacher | player | observer
+ *    - rooms: {"ROOM123": true, ...} — список разрешённых комнат
+ * 2) Примените правила из файла `firebase-database.rules.json`.
  *
- * {
- *   "rules": {
- *     "tests": {
- *       ".read": true,
- *       ".write": "auth != null"
- *     },
- *     "results": {
- *       ".read": true,
- *       ".write": true,
- *       ".indexOn": ["testId", "userName", "score"]
- *     },
- *     "sessions": {
- *       ".read": true,
- *       ".write": true
- *     }
- *   }
- * }
+ * Минимальный fallback, если Auth ещё не внедрён:
+ * - генерируйте сервером подписанный room-token и передавайте в URL `?roomToken=`
+ *   или в `sessionStorage/localStorage` под ключом `roomAccessToken`;
+ * - клиент попробует авторизоваться через signInWithCustomToken(roomToken).
  *
- * Для тестового режима (открытый доступ на 30 дней):
- * {
- *   "rules": {
- *     ".read": true,
- *     ".write": true
- *   }
- * }
+ * ВНИМАНИЕ: не используйте открытые правила `".read": true, ".write": true` в production.
  */
