@@ -392,6 +392,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
@@ -428,6 +429,15 @@
       let perQuestionTimeLeft = 0;
       let ratingTimeLeft = 0;
       let currentRenderedQuestion = -1; // Track to avoid re-render
+
+
+      function getAnswerValue(answerEntry) {
+        if (answerEntry && typeof answerEntry === 'object' && answerEntry.value !== undefined) {
+          return Number(answerEntry.value);
+        }
+        return Number(answerEntry);
+      }
+
       let _dashboardAnimFrame = null;  // rAF handle for throttled dashboard renders
 
       // Color/Shape mapping
@@ -748,8 +758,9 @@
           let correct = 0, wrong = 0;
           players.forEach(p => {
             const a = p.answers && p.answers[i];
-            if (a === undefined || a === null || a < 0) return;
-            if (Number(a) === q.correct) correct++; else wrong++;
+            const answerValue = getAnswerValue(a);
+            if (!Number.isFinite(answerValue) || answerValue < 0) return;
+            if (answerValue === q.correct) correct++; else wrong++;
           });
           const total = correct + wrong;
           const errorRate = total > 0 ? Math.round((wrong / total) * 100) : null;
@@ -1110,8 +1121,9 @@
         const totalPlayers = players.length || 1;
         const counts = new Array(q.options.length).fill(0);
         players.forEach(p => {
-          if (p.answers && p.answers[qIndex] !== undefined && p.answers[qIndex] >= 0) {
-            counts[p.answers[qIndex]]++;
+          if (p.answers && p.answers[qIndex] !== undefined) {
+            const answerValue = getAnswerValue(p.answers[qIndex]);
+            if (Number.isFinite(answerValue) && answerValue >= 0) counts[answerValue]++;
           }
         });
         const maxCount = Math.max(...counts, 1);
@@ -1214,7 +1226,7 @@
         });
       }
 
-      window.selectAnswer = function (index) {
+      window.selectAnswer = async function (index) {
         if (answers[currentQuestion] !== -1) return;
         answers[currentQuestion] = index;
         // Visual feedback via DOM, no re-render
@@ -1227,7 +1239,20 @@
         const room = localStorage.getItem('battle_room');
         const bs = battleSettings;
         if (bs && bs.perQuestionMode) {
-          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index);
+          try {
+            const result = await Storage.submitAnswer(room, myPlayerId, currentQuestion, index);
+            if (result && result.accepted === false) {
+              answers[currentQuestion] = -1;
+              alert(result.reason || 'Ответ отклонен сервером');
+              renderBattleQuestion(room);
+              return;
+            }
+          } catch (e) {
+            answers[currentQuestion] = -1;
+            alert('Не удалось отправить ответ. Попробуйте еще раз.');
+            renderBattleQuestion(room);
+            return;
+          }
           Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
         } else {
           Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });

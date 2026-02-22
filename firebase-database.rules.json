@@ -1,0 +1,43 @@
+{
+  "rules": {
+    "tests": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "results": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["testId", "userName", "score"]
+    },
+    "sessions": {
+      ".read": true,
+      ".write": true
+    },
+    "battles": {
+      ".read": true,
+      "$room": {
+        "players": {
+          "$player": {
+            "answers": {
+              "$question": {
+                ".write": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "api": {
+      "submitAnswer": {
+        "$room": {
+          "$player": {
+            "$question": {
+              ".read": false,
+              ".write": "auth != null && newData.hasChildren(['value','acceptedAt']) && newData.child('value').isNumber() && newData.child('acceptedAt').isNumber() && !data.exists()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

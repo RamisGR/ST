@@ -15,6 +15,7 @@ const Storage = (() => {
   };
 
   let db = null;
+  let functionsRef = null;
   let firebaseReady = false;
   let _onResultsChange = null; // callback for real-time leaderboard
   let _onTestsChange = null;
@@ -75,6 +76,9 @@ const Storage = (() => {
       } else {
         firebase.initializeApp(FirebaseConfig);
         db = firebase.database();
+      }
+      if (firebase.functions) {
+        functionsRef = firebase.functions();
       }
       firebaseReady = true;
       console.log('[TestArena] Firebase connected');
@@ -397,6 +401,23 @@ const Storage = (() => {
     }
   }
 
+  async function submitAnswer(roomCode, playerId, questionIndex, answerIndex) {
+    if (firebaseReady && functionsRef) {
+      const callable = functionsRef.httpsCallable('submitAnswer');
+      const response = await callable({
+        room: roomCode,
+        player: playerId,
+        question: questionIndex,
+        answer: answerIndex,
+      });
+      return response && response.data ? response.data : { accepted: true };
+    }
+
+    // Offline fallback keeps old local behavior.
+    saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex);
+    return { accepted: true, offline: true };
+  }
+
   function updateBattleState(roomCode, data) {
     if (firebaseReady) {
       db.ref('battles/' + roomCode).update(data);
@@ -495,7 +516,7 @@ const Storage = (() => {
     generateId,
     // Battle
     createBattle, joinBattle, updateBattlePlayer,
-    saveBattleAnswer, updateBattleState,
+    saveBattleAnswer, submitAnswer, updateBattleState,
     startBattle, finishBattle,
     onBattleChange, offBattleChange, getBattleOnce, getBattleRef,
     generateRoomCode,
