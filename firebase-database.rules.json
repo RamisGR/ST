@@ -1,0 +1,63 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "tests": {
+      ".read": true,
+      ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+    },
+    "results": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "sessions": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "battles": {
+      "$room": {
+        ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'player' || auth.token.role === 'observer') && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.rooms[$room] === true)",
+        ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host') && (auth.token.role === 'teacher' || auth.token.rooms[$room] === true)",
+
+        "status": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+          ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'countdown' || newData.val() === 'active' || newData.val() === 'showing_rating' || newData.val() === 'finished')"
+        },
+        "questionIndex": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "phase": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "phaseStartAt": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "phaseEndsAt": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "scoreboard": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+
+        "players": {
+          "$playerId": {
+            ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'observer' || (auth.token.role === 'player' && auth.uid === $playerId))",
+            ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || (auth.token.role === 'player' && auth.uid === $playerId))",
+            "answers": {
+              "$questionIndex": {
+                ".validate": "newData.isNumber() && data.val() == null"
+              }
+            }
+          }
+        }
+      }
+    },
+    "battleAudit": {
+      "$room": {
+        ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+        ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'server')"
+      }
+    }
+  }
+}
