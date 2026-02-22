@@ -19,6 +19,7 @@ const Storage = (() => {
   let _onResultsChange = null; // callback for real-time leaderboard
   let _onTestsChange = null;
   let _testsSeededInFirebase = false;
+  let _authInitialized = false;
   const _battleListeners = new Map();
 
   function _getBattlesMap() {
@@ -79,6 +80,11 @@ const Storage = (() => {
       firebaseReady = true;
       console.log('[TestArena] Firebase connected');
 
+      if (!_authInitialized) {
+        _authInitialized = true;
+        initFirebaseAuth();
+      }
+
       // Set up real-time listeners
       _listenTests();
       _listenResults();
@@ -86,6 +92,48 @@ const Storage = (() => {
       console.warn('[TestArena] Firebase init failed, using offline mode:', e.message);
       firebaseReady = false;
     }
+  }
+
+  function _extractRoomToken() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return (
+        params.get('roomToken') ||
+        sessionStorage.getItem('roomAccessToken') ||
+        localStorage.getItem('roomAccessToken') ||
+        null
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function initFirebaseAuth() {
+    try {
+      if (!firebaseReady || typeof firebase.auth !== 'function') return;
+      const auth = firebase.auth();
+      const customToken = FirebaseConfig.customToken || _extractRoomToken();
+      if (customToken) {
+        auth.signInWithCustomToken(customToken)
+          .then(() => console.log('[TestArena] Firebase Auth initialized via custom token'))
+          .catch((err) => console.warn('[TestArena] Custom token sign-in failed:', err.message));
+      } else {
+        console.warn('[TestArena] Firebase Auth token is not provided; battles rely on database rules and room token fallback.');
+      }
+    } catch (e) {
+      console.warn('[TestArena] Firebase Auth init failed:', e.message);
+    }
+  }
+
+  function appendBattleAuditLog(roomCode, action, payload) {
+    if (!firebaseReady) return;
+    const entry = {
+      action,
+      payload: payload || null,
+      ts: Date.now(),
+      byUid: (firebase.auth && firebase.auth().currentUser && firebase.auth().currentUser.uid) || null,
+    };
+    db.ref('battleAudit/' + roomCode).push(entry);
   }
 
   // ——— Firebase Real-time Listeners ———
@@ -376,6 +424,9 @@ const Storage = (() => {
   function updateBattlePlayer(roomCode, playerId, data) {
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/players/' + playerId).update(data);
+      if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
+        appendBattleAuditLog(roomCode, 'player_answers_bulk_update', { playerId, answers: data.answers });
+      }
     }
     const room = _getBattle(roomCode);
     if (room && room.players && room.players[playerId]) {
@@ -386,11 +437,20 @@ const Storage = (() => {
 
   function saveBattleAnswer(roomCode, playerId, questionIndex, answerIndex) {
     if (firebaseReady) {
-      db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex).set(answerIndex);
+      const answerRef = db.ref('battles/' + roomCode + '/players/' + playerId + '/answers/' + questionIndex);
+      answerRef.transaction((currentValue) => {
+        if (currentValue !== null && currentValue !== undefined) return; // forbid accepted answer edits
+        return answerIndex;
+      }, (error, committed) => {
+        if (!error && committed) {
+          appendBattleAuditLog(roomCode, 'answer_submitted', { playerId, questionIndex, answerIndex });
+        }
+      });
     }
     const room = _getBattle(roomCode);
     if (room && room.players && room.players[playerId]) {
       const answers = { ...(room.players[playerId].answers || {}) };
+      if (answers[questionIndex] !== undefined && answers[questionIndex] !== null) return;
       answers[questionIndex] = answerIndex;
       room.players[playerId] = { ...room.players[playerId], answers };
       _setBattle(roomCode, room);
@@ -400,6 +460,15 @@ const Storage = (() => {
   function updateBattleState(roomCode, data) {
     if (firebaseReady) {
       db.ref('battles/' + roomCode).update(data);
+      if (Object.prototype.hasOwnProperty.call(data, 'status')) {
+        appendBattleAuditLog(roomCode, 'status_changed', { status: data.status });
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'scoreboard')) {
+        appendBattleAuditLog(roomCode, 'scoreboard_changed', { scoreboard: data.scoreboard });
+      }
+      if (Object.prototype.hasOwnProperty.call(data, 'answers')) {
+        appendBattleAuditLog(roomCode, 'answers_changed', { answers: data.answers });
+      }
     }
     _patchBattle(roomCode, data);
   }
@@ -415,6 +484,7 @@ const Storage = (() => {
         status: 'countdown',
         startedAt: Date.now(),
       });
+      appendBattleAuditLog(roomCode, 'status_changed', { status: 'countdown' });
     }
 
     // After 4 seconds, set status to active (3-2-1-GO)
@@ -422,6 +492,7 @@ const Storage = (() => {
       _patchBattle(roomCode, { status: 'active' });
       if (firebaseReady) {
         db.ref('battles/' + roomCode + '/status').set('active');
+        appendBattleAuditLog(roomCode, 'status_changed', { status: 'active' });
       }
     }, 4000);
   }
@@ -430,6 +501,7 @@ const Storage = (() => {
     _patchBattle(roomCode, { status: 'finished' });
     if (firebaseReady) {
       db.ref('battles/' + roomCode + '/status').set('finished');
+      appendBattleAuditLog(roomCode, 'status_changed', { status: 'finished' });
     }
   }
 
