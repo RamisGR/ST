@@ -45,6 +45,31 @@ const FirebaseConfig = {
  *   }
  * }
  *
+
+ * Рекомендуемые правила для battlе-режима (чтобы игроки не меняли фазу комнаты):
+ *
+ * "battles": {
+ *   "$room": {
+ *     ".read": true,
+ *     "phase": {
+ *       ".write": "data.parent().child('creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val() && root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
+ *     },
+ *     "questionIndex": {
+ *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
+ *     },
+ *     "phaseStartedAt": {
+ *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
+ *     },
+ *     "phaseDurationMs": {
+ *       ".write": "root.child('battles/'+$room+'/creatorPlayerId').val() === newData.parent().child('creatorPlayerId').val()"
+ *     },
+ *     "players": {
+ *       "$playerId": {
+ *         ".write": true
+ *       }
+ *     }
+ *   }
+ * }
  * Для тестового режима (открытый доступ на 30 дней):
  * {
  *   "rules": {
