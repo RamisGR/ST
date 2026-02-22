@@ -433,7 +433,7 @@ const Storage = (() => {
       currentQuestion: 0,
       creatorPlayerId: null,
       players: {},
-      scoreboard: {},
+      participants: {},
       battleSettings,
     };
     if (firebaseReady) {
@@ -443,54 +443,111 @@ const Storage = (() => {
     return battle;
   }
 
-  async function joinBattle(roomCode, playerName, playerGroup) {
-    let status = 'waiting';
-    if (firebaseReady) {
-      const snapshot = await db.ref('battles/' + roomCode + '/status').once('value');
-      status = snapshot.val() || 'waiting';
-    } else {
-      const room = _getBattle(roomCode);
-      status = room && room.status ? room.status : 'waiting';
-    }
+  function joinBattle(roomCode, playerName, playerGroup) {
+    return joinBattleWithToken(roomCode, playerName, playerGroup, null);
+  }
 
-    if (status !== 'waiting') {
-      const err = new Error('Battle is no longer accepting players');
-      err.code = 'BATTLE_NOT_WAITING';
-      throw err;
-    }
+  function normalizePlayerName(name) {
+    return (name || '').trim().toLocaleLowerCase();
+  }
 
-    const playerId = generateId();
-    const player = {
+  function generateParticipantToken() {
+    const rand = Math.random().toString(36).slice(2, 10);
+    return 'pt_' + Date.now().toString(36) + rand;
+  }
+
+  function _buildNewPlayer(playerId, playerName, playerGroup, normalizedName) {
+    return {
       id: playerId,
       name: playerName,
+      nameNormalized: normalizedName,
       group: playerGroup,
       joinedAt: Date.now(),
       currentQuestion: 0,
       answeredCount: 0,
       answers: {},
     };
-    if (firebaseReady) {
-      await db.ref('battles/' + roomCode + '/players/' + playerId).set(player);
-    }
+  }
+
+  function _joinBattleOffline(roomCode, playerName, playerGroup, participantToken) {
+    const nameNormalized = normalizePlayerName(playerName);
+    if (!nameNormalized) return { ok: false, error: 'NAME_REQUIRED' };
+
     const room = _getBattle(roomCode);
-    if (room) {
-      room.players = room.players || {};
-      room.players[playerId] = player;
-      room.scoreboard = room.scoreboard || {};
-      room.scoreboard[playerId] = {
-        playerId,
-        name: playerName,
-        group: playerGroup,
-        answeredCount: 0,
-        computedScore: 0,
-        computedTimeSpent: 0,
-        computedFinished: false,
-        computedFinishedAt: null,
-        updatedAt: Date.now(),
-      };
-      _setBattle(roomCode, room);
+    if (!room) return { ok: false, error: 'ROOM_NOT_FOUND' };
+
+    room.players = room.players || {};
+    room.participants = room.participants || {};
+
+    if (participantToken && room.participants[participantToken]) {
+      const resumedPlayerId = room.participants[participantToken].playerId;
+      if (room.players[resumedPlayerId]) {
+        _setBattle(roomCode, room);
+        return { ok: true, token: participantToken, playerId: resumedPlayerId, resumed: true };
+      }
     }
-    return playerId;
+
+    const nameTaken = Object.values(room.players).some((p) => (
+      p && normalizePlayerName(p.nameNormalized || p.name) === nameNormalized
+    ));
+    if (nameTaken) return { ok: false, error: 'NAME_TAKEN' };
+
+    const token = participantToken || generateParticipantToken();
+    if (room.participants[token] && room.players[room.participants[token].playerId]) {
+      return { ok: true, token, playerId: room.participants[token].playerId, resumed: true };
+    }
+
+    const playerId = generateId();
+    room.players[playerId] = _buildNewPlayer(playerId, playerName, playerGroup, nameNormalized);
+    room.participants[token] = { playerId, nameNormalized, issuedAt: Date.now() };
+    _setBattle(roomCode, room);
+    return { ok: true, token, playerId, resumed: false };
+  }
+
+  function joinBattleWithToken(roomCode, playerName, playerGroup, participantToken) {
+    if (!firebaseReady) {
+      return Promise.resolve(_joinBattleOffline(roomCode, playerName, playerGroup, participantToken || null));
+    }
+
+    const nameNormalized = normalizePlayerName(playerName);
+    if (!nameNormalized) return Promise.resolve({ ok: false, error: 'NAME_REQUIRED' });
+
+    const token = participantToken || generateParticipantToken();
+    const roomRef = db.ref('battles/' + roomCode);
+
+    return roomRef.transaction((room) => {
+      if (!room) return room;
+
+      room.players = room.players || {};
+      room.participants = room.participants || {};
+
+      if (room.participants[token]) {
+        const resumedPlayerId = room.participants[token].playerId;
+        if (room.players[resumedPlayerId]) {
+          return room;
+        }
+      }
+
+      const nameTaken = Object.values(room.players).some((p) => (
+        p && normalizePlayerName(p.nameNormalized || p.name) === nameNormalized
+      ));
+      if (nameTaken) {
+        return; // abort: collision policy is strict deny
+      }
+
+      const playerId = generateId();
+      room.players[playerId] = _buildNewPlayer(playerId, playerName, playerGroup, nameNormalized);
+      room.participants[token] = { playerId, nameNormalized, issuedAt: Date.now() };
+      return room;
+    }).then((result) => {
+      if (!result || !result.committed) return { ok: false, error: 'NAME_TAKEN' };
+      const room = (result.snapshot && result.snapshot.val()) || {};
+      const participants = room.participants || {};
+      const entry = participants[token];
+      if (!entry || !entry.playerId) return { ok: false, error: 'JOIN_FAILED' };
+      const resumed = !!participantToken;
+      return { ok: true, token, playerId: entry.playerId, resumed };
+    }).catch(() => ({ ok: false, error: 'JOIN_FAILED' }));
   }
 
   function updateBattlePlayer(roomCode, playerId, data) {
@@ -692,8 +749,8 @@ const Storage = (() => {
     clearAllResults, resetAllData,
     generateId,
     // Battle
-    createBattle, joinBattle, updateBattlePlayer,
-    saveBattleAnswer, submitAnswer, updateBattleState,
+    createBattle, joinBattle, joinBattleWithToken, normalizePlayerName, updateBattlePlayer,
+    saveBattleAnswer, updateBattleState,
     startBattle, finishBattle,
     setBattleHost, advanceBattlePhase,
     onBattleChange, offBattleChange, getBattleOnce, getBattleRef,
