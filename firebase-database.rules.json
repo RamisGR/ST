@@ -1,42 +1,62 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "tests": {
       ".read": true,
-      ".write": "auth != null"
+      ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
     },
     "results": {
-      ".read": true,
-      ".write": true,
-      ".indexOn": ["testId", "userName", "score"]
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
     "sessions": {
-      ".read": true,
-      ".write": true
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
     "battles": {
-      ".read": true,
       "$room": {
+        ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'player' || auth.token.role === 'observer') && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.rooms[$room] === true)",
+        ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host') && (auth.token.role === 'teacher' || auth.token.rooms[$room] === true)",
+
+        "status": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+          ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'countdown' || newData.val() === 'active' || newData.val() === 'showing_rating' || newData.val() === 'finished')"
+        },
+        "questionIndex": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "phase": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "phaseStartAt": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "phaseEndsAt": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+        "scoreboard": {
+          ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')"
+        },
+
         "players": {
-          "$player": {
+          "$playerId": {
+            ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'observer' || (auth.token.role === 'player' && auth.uid === $playerId))",
+            ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || (auth.token.role === 'player' && auth.uid === $playerId))",
             "answers": {
-              "$question": {
-                ".write": false
+              "$questionIndex": {
+                ".validate": "newData.isNumber() && data.val() == null"
               }
             }
           }
         }
       }
     },
-    "api": {
-      "submitAnswer": {
-        "$room": {
-          "$player": {
-            "$question": {
-              ".read": false,
-              ".write": "auth != null && newData.hasChildren(['value','acceptedAt']) && newData.child('value').isNumber() && newData.child('acceptedAt').isNumber() && !data.exists()"
-            }
-          }
-        }
+    "battleAudit": {
+      "$room": {
+        ".read": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host')",
+        ".write": "auth != null && (auth.token.role === 'teacher' || auth.token.role === 'host' || auth.token.role === 'server')"
       }
     }
   }
