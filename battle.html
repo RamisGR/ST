@@ -392,6 +392,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 
   <script src="js/firebase-config.js"></script>
   <script src="js/sample-tests.js"></script>
@@ -419,6 +420,7 @@
       let answers = [];
       let testData = null;
       let timerInterval = null;
+      let phaseTickerInterval = null;
       let timeLeft = 0;
       let testStartTime = 0;
       let showingIntermediateResults = false;
@@ -443,7 +445,17 @@
       let battleSettings = null;
       let perQuestionTimeLeft = 0;
       let ratingTimeLeft = 0;
+      let phaseAdvanceInFlight = false;
       let currentRenderedQuestion = -1; // Track to avoid re-render
+
+
+      function getAnswerValue(answerEntry) {
+        if (answerEntry && typeof answerEntry === 'object' && answerEntry.value !== undefined) {
+          return Number(answerEntry.value);
+        }
+        return Number(answerEntry);
+      }
+
       let _dashboardAnimFrame = null;  // rAF handle for throttled dashboard renders
 
       // Color/Shape mapping
@@ -453,6 +465,16 @@
         { color: 'var(--yellow)', shape: 'shape-circle', shadow: 'var(--yellow-shadow)' },
         { color: 'var(--green)', shape: 'shape-square', shadow: 'var(--green-shadow)' }
       ];
+
+      function getScoreboardPlayers(data) {
+        if (!data || !data.scoreboard) return [];
+        return Object.values(data.scoreboard)
+          .sort((a, b) => {
+            const scoreDiff = (b.computedScore || 0) - (a.computedScore || 0);
+            if (scoreDiff !== 0) return scoreDiff;
+            return (a.computedTimeSpent || 0) - (b.computedTimeSpent || 0);
+          });
+      }
 
       if (roomParam) {
         // Check if returning as observer
@@ -624,49 +646,39 @@
           battle = data;
           battleSettings = data.battleSettings || null;
 
-          if (data.status === 'countdown' && !showingIntermediateResults) {
+          const phase = data.phase || (data.status === 'active' ? 'question' : data.status === 'showing_rating' ? 'rating' : data.status || 'waiting');
+          currentQuestion = Number(data.questionIndex || data.currentQuestion || 0);
+
+          if (phase === 'waiting') {
+            stopPhaseTicker();
+            renderLobby(roomCode, data, isCreator);
+            return;
+          }
+          if (phase === 'countdown') {
+            if (isObserver) showTeacherCountdown(roomCode);
+            else showCountdown(roomCode);
+            startPhaseTicker(roomCode);
+            return;
+          }
+          if (phase === 'question') {
             if (isObserver) {
-              showTeacherCountdown(roomCode);
+              scheduleDashboardRender(roomCode);
             } else {
-              showCountdown(roomCode);
+              startBattleTest(roomCode);
             }
+            startPhaseTicker(roomCode);
             return;
           }
-          if (data.status === 'active') {
-            if (!showingIntermediateResults) {
-              if (isObserver) {
-                scheduleDashboardRender(roomCode);
-              } else if (!battleTestStarted) {
-                startBattleTest(roomCode);
-              } else {
-                // Only update timer display, not full re-render
-                const timerEl = document.querySelector('.timer-circle');
-                if (timerEl) {
-                  const bs = battleSettings;
-                  if (bs && bs.perQuestionMode) {
-                    timerEl.textContent = perQuestionTimeLeft;
-                  } else {
-                    timerEl.textContent = timeLeft;
-                  }
-                }
-              }
-            }
-            // ALWAYS return for 'active' status — never fall through to renderLobby
+          if (phase === 'rating') {
+            if (isObserver) renderTeacherRating(roomCode);
+            else renderRatingScreen(roomCode, currentQuestion);
+            startPhaseTicker(roomCode);
             return;
           }
-          if (data.status === 'showing_rating') {
-            if (isObserver) {
-              renderTeacherRating(roomCode);
-            }
-            // Students see their own rating via local control
-            return;
-          }
-          if (data.status === 'finished') {
-            if (isObserver) {
-              showTeacherResults(roomCode);
-            } else {
-              showFinalResults(roomCode);
-            }
+          if (phase === 'finished') {
+            stopPhaseTicker();
+            if (isObserver) showTeacherResults(roomCode);
+            else showFinalResults(roomCode);
             return;
           }
 
@@ -747,14 +759,14 @@
         });
 
         if (isCreator) {
-          document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode));
+          document.getElementById('startBtn').addEventListener('click', () => Storage.startBattle(roomCode, hostActorId || myPlayerId));
         }
       }
 
       // ——— TEACHER OBSERVER VIEWS ———
 
       function showTeacherCountdown(roomCode) {
-        let count = 3;
+        let count = Math.max(0, Math.ceil(getPhaseMsLeft() / 1000));
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -781,8 +793,9 @@
           let correct = 0, wrong = 0;
           players.forEach(p => {
             const a = p.answers && p.answers[i];
-            if (a === undefined || a === null || a < 0) return;
-            if (Number(a) === q.correct) correct++; else wrong++;
+            const answerValue = getAnswerValue(a);
+            if (!Number.isFinite(answerValue) || answerValue < 0) return;
+            if (answerValue === q.correct) correct++; else wrong++;
           });
           const total = correct + wrong;
           const errorRate = total > 0 ? Math.round((wrong / total) * 100) : null;
@@ -845,14 +858,17 @@
       function renderTeacherDashboard(roomCode) {
         if (!battle) return;
         const players = battle.players ? Object.values(battle.players) : [];
+        const scoreboardPlayers = getScoreboardPlayers(battle);
+        const scoreboardById = new Map(scoreboardPlayers.map(p => [p.playerId, p]));
+        const livePlayers = players.map((p) => ({ ...p, ...(scoreboardById.get(p.id) || {}) }));
         testData = testData || Storage.getTest(battle.testId);
         if (!testData) return;
 
         const totalQ = testData.questions.length;
-        const allFinished = players.length > 0 && players.every(p => p.finished);
-        const finishedCount = players.filter(p => p.finished).length;
-        const avgProgress = players.length > 0
-          ? Math.round(players.reduce((sum, p) => sum + (p.answeredCount || 0), 0) / players.length)
+        const allFinished = livePlayers.length > 0 && livePlayers.every(p => p.computedFinished);
+        const finishedCount = livePlayers.filter(p => p.computedFinished).length;
+        const avgProgress = livePlayers.length > 0
+          ? Math.round(livePlayers.reduce((sum, p) => sum + (p.answeredCount || 0), 0) / livePlayers.length)
           : 0;
 
         document.getElementById('app').innerHTML = `
@@ -862,11 +878,11 @@
             <div style="display:flex; gap:15px; justify-content:center; flex-wrap:wrap; margin:20px 0 30px;">
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('players_stat')}</div>
-                <div style="font-size:1.8rem; font-family:var(--font-display);">${players.length}</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${livePlayers.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('finished_stat')}</div>
-                <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${players.length}</div>
+                <div style="font-size:1.8rem; font-family:var(--font-display);">${finishedCount}/${livePlayers.length}</div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_progress')}</div>
@@ -891,11 +907,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                  ${players.sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0)).map((p, i) => {
+                  ${livePlayers.sort((a, b) => (b.computedScore || 0) - (a.computedScore || 0)).map((p, i) => {
           const answered = p.answeredCount || 0;
-          const correct = p.correctCount || 0;
+          const correct = p.computedScore || 0;
           const pct = Math.round((answered / totalQ) * 100);
-          const isFinished = p.finished;
+          const isFinished = !!p.computedFinished;
           const barColor = isFinished ? 'var(--green)' : 'var(--blue)';
           const statusColor = isFinished ? '#26890C' : '#D89E00';
           const statusText = isFinished ? t('status_done') : t('status_playing');
@@ -930,7 +946,7 @@
         }).join('')}
                 </tbody>
               </table>
-              ${players.length === 0 ? `<p style="color:#999; padding:30px; text-align:center;">${t('waiting_start')}</p>` : ''}
+              ${livePlayers.length === 0 ? `<p style="color:#999; padding:30px; text-align:center;">${t('waiting_start')}</p>` : ''}
             </div>
 
             ${buildQuestionErrorStatsHtml(players, testData.questions)}
@@ -948,9 +964,9 @@
       }
 
       function showTeacherResults(roomCode) {
-        if (!battle || !battle.players) return;
+        if (!battle) return;
         testData = testData || Storage.getTest(battle.testId);
-        const players = Object.values(battle.players).sort((a, b) => (b.correctCount || 0) - (a.correctCount || 0));
+        const players = getScoreboardPlayers(battle);
         const totalQ = testData ? testData.questions.length : (battle.questionsCount || 0);
 
         document.getElementById('app').innerHTML = `
@@ -965,13 +981,13 @@
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('avg_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
-                  ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.correctCount || 0), 0) / players.length * 100 / totalQ) : 0}%
+                  ${players.length > 0 ? Math.round(players.reduce((s, p) => s + (p.computedScore || 0), 0) / players.length * 100 / totalQ) : 0}%
                 </div>
               </div>
               <div style="background:rgba(255,255,255,0.15); padding:12px 25px; border-radius:12px; color:white; font-weight:800;">
                 <div style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; margin-bottom:4px;">${t('best_score')}</div>
                 <div style="font-size:1.8rem; font-family:var(--font-display);">
-                  ${players.length > 0 ? Math.round((players[0].correctCount || 0) / totalQ * 100) : 0}%
+                  ${players.length > 0 ? Math.round((players[0].computedScore || 0) / totalQ * 100) : 0}%
                 </div>
               </div>
             </div>
@@ -990,9 +1006,9 @@
                 </thead>
                 <tbody>
                   ${players.map((p, i) => {
-          const correct = p.correctCount || 0;
+          const correct = p.computedScore || 0;
           const scorePct = totalQ > 0 ? Math.round(correct / totalQ * 100) : 0;
-          const timeSpent = p.timeSpent || 0;
+          const timeSpent = p.computedTimeSpent || 0;
           const rankColors = ['#D89E00', '#C0C0C0', '#CD7F32'];
           const rankBg = i < 3 ? rankColors[i] : '#eee';
           const rankColor = i < 3 ? 'white' : '#888';
@@ -1029,7 +1045,7 @@
       // ——— STUDENT VIEWS (unchanged) ———
 
       function showCountdown(roomCode) {
-        let count = 3;
+        let count = Math.max(0, Math.ceil(getPhaseMsLeft() / 1000));
         const render = () => {
           document.getElementById('app').innerHTML = `
             <div class="center-content" style="height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;">
@@ -1052,57 +1068,57 @@
         }, 1000);
       }
 
-      function startBattleTest(roomCode) {
-        if (battleTestStarted) return;
-        battleTestStarted = true;
-        testData = Storage.getTest(battle.testId);
-        if (!testData) return;
-        const bs = battleSettings;
-        answers = new Array(testData.questions.length).fill(-1);
-        currentQuestion = 0;
-        currentRenderedQuestion = -1;
-        testStartTime = Date.now();
-        if (bs && bs.perQuestionMode) {
-          perQuestionTimeLeft = bs.perQuestionTime || 20;
-          renderBattleQuestion(roomCode);
-          startPerQuestionTimer(roomCode);
-        } else {
-          timeLeft = testData.timeLimit;
-          renderBattleQuestion(roomCode);
-          timerInterval = setInterval(() => {
-            timeLeft--;
-            const te = document.querySelector('.timer-circle');
-            if (te) { te.textContent = timeLeft; if (timeLeft <= 10) te.style.background = 'var(--red)'; }
-            if (timeLeft <= 0) finishBattleTest(roomCode);
-          }, 1000);
-        }
+      function getPhaseMsLeft() {
+        if (!battle || !battle.phaseStartedAt) return 0;
+        const total = Number(battle.phaseDurationMs || 0);
+        if (total <= 0) return 0;
+        return Math.max(0, (battle.phaseStartedAt + total) - Date.now());
       }
 
-      function startPerQuestionTimer(roomCode) {
-        if (timerInterval) clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-          perQuestionTimeLeft--;
-          const te = document.querySelector('.timer-circle');
-          if (te) { te.textContent = perQuestionTimeLeft; if (perQuestionTimeLeft <= 5) te.style.background = 'var(--red)'; }
-          if (perQuestionTimeLeft <= 0) {
-            clearInterval(timerInterval); timerInterval = null;
-            Storage.saveBattleAnswer(roomCode, myPlayerId, currentQuestion, answers[currentQuestion]);
-            let cc = 0;
-            answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) cc++; });
-            Storage.updateBattlePlayer(roomCode, myPlayerId, { currentQuestion, correctCount: cc, answeredCount: answers.filter(a => a >= 0).length });
-            showingIntermediateResults = true;
-            renderRatingScreen(roomCode, currentQuestion);
+      function stopPhaseTicker() {
+        if (phaseTickerInterval) clearInterval(phaseTickerInterval);
+        phaseTickerInterval = null;
+        phaseAdvanceInFlight = false;
+      }
+
+      function startPhaseTicker(roomCode) {
+        const isCreator = localStorage.getItem('battle_is_creator') === 'true';
+        if (phaseTickerInterval) return;
+        phaseTickerInterval = setInterval(() => {
+          if (!battle) return;
+          const secLeft = Math.ceil(getPhaseMsLeft() / 1000);
+          const timerEl = document.querySelector('.timer-circle');
+          if (timerEl) {
+            timerEl.textContent = secLeft;
+            if (secLeft <= 5) timerEl.style.background = 'var(--red)';
           }
-        }, 1000);
+          const fill = document.getElementById('ratingTimerFill');
+          if (fill && battle.phaseDurationMs > 0) {
+            fill.style.width = `${Math.max(0, Math.min(100, (getPhaseMsLeft() / battle.phaseDurationMs) * 100))}%`;
+          }
+          if (getPhaseMsLeft() <= 0 && !phaseAdvanceInFlight && isCreator && (hostActorId || myPlayerId)) {
+            phaseAdvanceInFlight = true;
+            Storage.advanceBattlePhase(roomCode, hostActorId || myPlayerId).finally(() => { phaseAdvanceInFlight = false; });
+          }
+        }, 250);
+      }
+
+      function startBattleTest(roomCode) {
+        testData = Storage.getTest(battle.testId);
+        if (!testData) return;
+        if (!battleTestStarted) {
+          battleTestStarted = true;
+          if (!answers.length) answers = new Array(testData.questions.length).fill(-1);
+          testStartTime = testStartTime || Date.now();
+        }
+        currentQuestion = Number(battle.questionIndex || 0);
+        renderBattleQuestion(roomCode);
       }
 
       function renderBattleQuestion(roomCode) {
-        if (showingIntermediateResults) return;
-        if (currentRenderedQuestion === currentQuestion) return;
-        currentRenderedQuestion = currentQuestion;
         const q = testData.questions[currentQuestion];
-        const bs = battleSettings;
-        const displayTime = (bs && bs.perQuestionMode) ? perQuestionTimeLeft : timeLeft;
+        if (!q) return;
+        const displayTime = Math.ceil(getPhaseMsLeft() / 1000);
 
         document.getElementById('app').innerHTML = `
           <div class="container center-content" style="max-width:1000px; padding-top:20px; width:100%;">
@@ -1143,8 +1159,9 @@
         const totalPlayers = players.length || 1;
         const counts = new Array(q.options.length).fill(0);
         players.forEach(p => {
-          if (p.answers && p.answers[qIndex] !== undefined && p.answers[qIndex] >= 0) {
-            counts[p.answers[qIndex]]++;
+          if (p.answers && p.answers[qIndex] !== undefined) {
+            const answerValue = getAnswerValue(p.answers[qIndex]);
+            if (Number.isFinite(answerValue) && answerValue >= 0) counts[answerValue]++;
           }
         });
         const maxCount = Math.max(...counts, 1);
@@ -1172,16 +1189,16 @@
 
       function renderRatingScreen(roomCode, qIndex) {
         const q = testData.questions[qIndex];
+        if (!q) return;
         const bs = battleSettings || {};
-        const ratingDuration = bs.ratingDuration || 4;
-        const ratingTitle = bs.ratingTitle || '\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043e\u0442\u0432\u0435\u0442\u043e\u0432';
+        const ratingTitle = bs.ratingTitle || 'Распределение ответов';
         const players = battle && battle.players ? Object.values(battle.players) : [];
         const chartHtml = buildChartHtml(q, qIndex, bs, players);
 
         document.getElementById('app').innerHTML = `
           <div class="container center-content fade-in" style="max-width:950px;padding-top:20px;text-align:center;">
             <div style="background:rgba(0,0,0,0.3);color:white;padding:10px 25px;border-radius:30px;font-weight:900;font-family:var(--font-display);font-size:1rem;margin-bottom:15px;">
-              \u0412\u043e\u043f\u0440\u043e\u0441 ${qIndex + 1} / ${testData.questions.length}
+              Вопрос ${qIndex + 1} / ${testData.questions.length}
             </div>
             <div class="rating-screen">
               <h3 style="margin:0 0 5px;color:#888;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">${Utils.escapeHtml(ratingTitle)}</h3>
@@ -1196,32 +1213,13 @@
             document.querySelectorAll('[data-target-width]').forEach(el => { el.style.width = el.dataset.targetWidth; });
           }, 50);
         });
-        ratingTimeLeft = ratingDuration;
-        const ratingIv = setInterval(() => {
-          ratingTimeLeft--;
-          const fill = document.getElementById('ratingTimerFill');
-          if (fill) fill.style.width = `${(ratingTimeLeft / ratingDuration) * 100}%`;
-          if (ratingTimeLeft <= 0) {
-            clearInterval(ratingIv);
-            showingIntermediateResults = false;
-            if (currentQuestion < testData.questions.length - 1) {
-              currentQuestion++;
-              currentRenderedQuestion = -1;
-              perQuestionTimeLeft = (battleSettings && battleSettings.perQuestionTime) || 20;
-              renderBattleQuestion(roomCode);
-              startPerQuestionTimer(roomCode);
-            } else {
-              finishBattleTest(roomCode);
-            }
-          }
-        }, 1000);
       }
 
       function renderTeacherRating(roomCode) {
         if (!battle) return;
         testData = testData || Storage.getTest(battle.testId);
         if (!testData) return;
-        const qIndex = battle.currentQuestion || 0;
+        const qIndex = battle.questionIndex || battle.currentQuestion || 0;
         const q = testData.questions[qIndex];
         if (!q) return;
         const bs = battle.battleSettings || {};
@@ -1247,7 +1245,7 @@
         });
       }
 
-      window.selectAnswer = function (index) {
+      window.selectAnswer = async function (index) {
         if (answers[currentQuestion] !== -1) return;
         answers[currentQuestion] = index;
         // Visual feedback via DOM, no re-render
@@ -1255,12 +1253,23 @@
           if (i === index) { btn.style.transform = 'scale(0.98)'; btn.style.opacity = '1'; }
           else { btn.style.opacity = '0.3'; }
         });
-        let correctCount = 0;
-        answers.forEach((a, i) => { if (a >= 0 && a === testData.questions[i].correct) correctCount++; });
         const room = localStorage.getItem('battle_room');
         const bs = battleSettings;
         if (bs && bs.perQuestionMode) {
-          Storage.saveBattleAnswer(room, myPlayerId, currentQuestion, index);
+          try {
+            const result = await Storage.submitAnswer(room, myPlayerId, currentQuestion, index);
+            if (result && result.accepted === false) {
+              answers[currentQuestion] = -1;
+              alert(result.reason || 'Ответ отклонен сервером');
+              renderBattleQuestion(room);
+              return;
+            }
+          } catch (e) {
+            answers[currentQuestion] = -1;
+            alert('Не удалось отправить ответ. Попробуйте еще раз.');
+            renderBattleQuestion(room);
+            return;
+          }
           Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
         } else {
           Storage.updateBattlePlayer(room, myPlayerId, { currentQuestion, correctCount, answeredCount: answers.filter(a => a >= 0).length });
@@ -1285,19 +1294,6 @@
           if (a >= 0 && a === testData.questions[i].correct) correctCount++;
         });
 
-        const rawTime = Math.round((Date.now() - testStartTime) / 1000);
-        const _bs = battleSettings;
-        const maxTime = (_bs && _bs.perQuestionMode)
-          ? (_bs.perQuestionTime || 20) * testData.questions.length
-          : (testData.timeLimit || Infinity);
-        const timeSpent = Math.min(rawTime, maxTime);
-
-        Storage.updateBattlePlayer(roomCode, myPlayerId, {
-          finished: true,
-          finishedAt: Date.now(),
-          correctCount: correctCount,
-          timeSpent: timeSpent
-        });
 
         // Wait screen
         document.getElementById('app').innerHTML = `
@@ -1315,9 +1311,9 @@
         const isCreator = localStorage.getItem('battle_is_creator') === 'true';
         if (isCreator) {
           const checkAll = setInterval(() => {
-            if (!battle || !battle.players) return;
-            const players = Object.values(battle.players);
-            if (players.every(p => p.finished)) {
+            if (!battle) return;
+            const players = getScoreboardPlayers(battle);
+            if (players.length > 0 && players.every(p => p.computedFinished)) {
               clearInterval(checkAll);
               Storage.finishBattle(roomCode);
             }
@@ -1326,8 +1322,8 @@
       }
 
       function showFinalResults(roomCode) {
-        if (!battle || !battle.players) return;
-        const players = Object.values(battle.players).sort((a, b) => b.correctCount - a.correctCount);
+        if (!battle) return;
+        const players = getScoreboardPlayers(battle);
         const top3 = players.slice(0, 3);
 
         const p1 = top3[0];
@@ -1344,7 +1340,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#C0C0C0; color:white; width:70px; height:70px; font-size:1.8rem;">${p2.name.charAt(0)}</div>
                    <div class="podium-rank-2" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#D8D8D8,#9A9A9A); height:140px;">2</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p2.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.correctCount} ${t('pts')}</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p2.computedScore || 0} ${t('pts')}</div>
                 </div>
               ` : ''}
 
@@ -1354,7 +1350,7 @@
                  </div>
                  <div class="podium-rank-1" style="width:100%; border-radius:15px 15px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:20px; font-weight:900; font-size:4rem; color:white; box-shadow:0 8px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#FFD700,#C68C00); height:180px;">1</div>
                  <div style="background:white; color:#333; width:100%; padding:15px 5px; font-weight:900; border-radius:0 0 8px 8px; font-size:1.4rem; margin-top:4px;">${Utils.escapeHtml(p1.name)}</div>
-                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.correctCount} ${t('pts')}</div>
+                 <div style="color:white; font-weight:800; margin-top:10px; font-size:1.5rem; font-family:var(--font-display);">${p1.computedScore || 0} ${t('pts')}</div>
               </div>
 
               ${p3 ? `
@@ -1362,7 +1358,7 @@
                    <div class="avatar" style="margin-bottom:15px; background:#CD7F32; color:white; width:70px; height:70px; font-size:1.8rem;">${p3.name.charAt(0)}</div>
                    <div class="podium-rank-3" style="width:100%; border-radius:12px 12px 0 0; display:flex; align-items:flex-end; justify-content:center; padding-bottom:15px; font-weight:900; color:white; font-size:2.5rem; box-shadow:0 6px 0 rgba(0,0,0,0.2); background:linear-gradient(180deg,#E0A060,#B06828); height:110px;">3</div>
                    <div style="background:white; color:#333; width:100%; padding:10px 5px; font-weight:800; border-radius:0 0 8px 8px; font-size:1rem; margin-top:4px;">${Utils.escapeHtml(p3.name)}</div>
-                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.correctCount} ${t('pts')}</div>
+                   <div style="color:white; font-weight:700; margin-top:10px; font-family:var(--font-display);">${p3.computedScore || 0} ${t('pts')}</div>
                 </div>
               ` : ''}
             </div>
@@ -1380,8 +1376,8 @@
                       <td style="padding:10px 8px; width:36px; font-size:${i < 3 ? '1.25rem' : '1rem'}; text-align:center;">${rankLabel}</td>
                       <td style="padding:10px 8px; color:white; font-weight:800; font-size:1rem;">${Utils.escapeHtml(p.name)}</td>
                       <td style="padding:10px 8px; color:rgba(255,255,255,0.5); font-size:0.85rem;">${Utils.escapeHtml(p.group || '')}</td>
-                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.correctCount} ${t('pts')}</td>
-                      <td style="padding:10px 8px; color:rgba(255,255,255,0.5); text-align:right; font-size:0.85rem;">${Utils.formatTime(p.timeSpent || 0)}</td>
+                      <td style="padding:10px 8px; color:white; font-weight:900; text-align:right; font-family:var(--font-display);">${p.computedScore || 0} ${t('pts')}</td>
+                      <td style="padding:10px 8px; color:rgba(255,255,255,0.5); text-align:right; font-size:0.85rem;">${Utils.formatTime(p.computedTimeSpent || 0)}</td>
                     </tr>`;
                   }).join('')}
                 </tbody>

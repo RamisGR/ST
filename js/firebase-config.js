@@ -26,30 +26,10 @@ const FirebaseConfig = {
 
 /**
  * Правила безопасности для Realtime Database (вставить в консоли Firebase):
+ * См. актуальный файл: firebase-database.rules.json
  *
- * {
- *   "rules": {
- *     "tests": {
- *       ".read": true,
- *       ".write": "auth != null"
- *     },
- *     "results": {
- *       ".read": true,
- *       ".write": true,
- *       ".indexOn": ["testId", "userName", "score"]
- *     },
- *     "sessions": {
- *       ".read": true,
- *       ".write": true
- *     }
- *   }
- * }
- *
- * Для тестового режима (открытый доступ на 30 дней):
- * {
- *   "rules": {
- *     ".read": true,
- *     ".write": true
- *   }
- * }
+ * Ключевые требования:
+ * 1) Прямой client write в battles/*/players/*/answers/* запрещён.
+ * 2) Ответы принимаются только через серверную функцию submitAnswer.
+ * 3) acceptedAt фиксируется при первом принятом ответе и далее не меняется.
  */
